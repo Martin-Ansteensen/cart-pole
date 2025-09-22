@@ -9,6 +9,7 @@ import matplotlib as mpl
 from matplotlib.animation import FuncAnimation, FFMpegWriter
 from matplotlib.patches import Circle, FancyBboxPatch
 import imageio_ffmpeg
+from rich.progress import Progress
 
 from simulation import SimulationResult
 from dynamics import PhysicalParamters
@@ -69,13 +70,21 @@ def animate_simulation(sim_result: SimulationResult, params: PhysicalParamters,
 
     # FPS to play back simulation in real time
     fps = 1 / sim_result.dt
-    anim = FuncAnimation(fig, update, frames=len(sim_result.time_ts),
+    n_frames = len(sim_result.time_ts)
+    anim = FuncAnimation(fig, update, frames=n_frames,
                          interval=1000.0 / fps, blit=True)
 
     if save_path:
         writer = FFMpegWriter(fps=int(round(fps)), codec='h264', bitrate=1800)
-        anim.save(f'{save_path}.mp4', writer=writer, dpi=150)
-        print('Animation saved')
+    
+        with Progress() as progress:
+            task = progress.add_task("Saving animation", total=n_frames)
+            def cb(curr_frame: int, total_frames: int):
+                '''Callback function to update progress bar for video saving'''
+                progress.update(task, completed=curr_frame)
+
+            anim.save(f'{save_path}.mp4', writer=writer, dpi=150, progress_callback=cb)
+        
     plt.show()
 
     return anim
