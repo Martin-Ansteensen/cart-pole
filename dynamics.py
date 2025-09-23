@@ -1,4 +1,4 @@
-#!/usr/bin/python3
+﻿#!/usr/bin/python3
 from dataclasses import dataclass, asdict
 
 import numpy as np
@@ -16,11 +16,11 @@ class PhysicalParamters:
         * tip mass attached to the end of the pole
     The system is not subject to friction
     '''
-    M: float = 0.5          # cart mass
-    l: float = 1.0          # pole length
-    m: float = 0.5         # weight of mass on tip of pole
-    g: float = 9.81         # gravitation
-    I: float = m * l ** 2   # Inertia of pole around pivot
+    M: float = 0.5      # cart mass (kg)
+    l: float = 1.0      # pole length (m)
+    m: float = 0.2      # tip mass (kg)
+    g: float = 9.81     # gravity (m/s^2)
+    I: float = 0.0      # additional pole inertia about the hinge (kg·m^2)
 
 
 class CartPoleDynamics:
@@ -34,7 +34,7 @@ class CartPoleDynamics:
     def derivatives(self, state: State, u: float, w: float = 0.0) -> State:
         '''Return the time-derivative of the state. Equations of motion taken from
         https://se.mathworks.com/help/symbolic/derive-and-simulate-cart-pole-system.html.
-        
+        https://en.wikipedia.org/wiki/Inverted_pendulum
         Returns:
             [x_dot, x_ddot, theta_dot, theta_ddot]
         '''
@@ -55,7 +55,7 @@ class CartPoleDynamics:
         # A is matrixM in Mathworks page
         A = array([
             [M + m,                  -l * m * cos(theta)],
-            [-l * m * cos(theta),    m * l ** 2 + I]
+            [-l * m * cos(theta),     m * l ** 2 + I]
         ])
 
         # b is matrixF in Mathworks page, where dF (external force on pole) and friction is ignored
@@ -68,3 +68,22 @@ class CartPoleDynamics:
         x_ddot, theta_ddot = np.linalg.solve(A, b)
 
         return array([x_dot, x_ddot, theta_dot, theta_ddot], dtype=float)
+
+    def calculate_energy(self, state: State) -> float:
+        """Total mechanical energy (kinetic + potential)."""
+
+        _, x_dot, theta, theta_dot = state
+
+        m = self.m
+        M = self.M
+        l = self.l
+        I = self.I
+        g = self.g
+
+        T = 0.5 * (M + m) * x_dot ** 2
+        T += -m * l * np.cos(theta) * x_dot * theta_dot
+        T += 0.5 * (m * l ** 2) * theta_dot ** 2
+
+        V = m * g * l * np.cos(theta)
+
+        return T + V

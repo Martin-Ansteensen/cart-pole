@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import numpy as np
-from numpy import array, cos, sin
+from numpy import array, cos, sin, pi
 import matplotlib.pyplot as plt
 import matplotlib as mpl
 from matplotlib.animation import FuncAnimation, FFMpegWriter
@@ -26,13 +26,21 @@ def animate_simulation(sim_result: SimulationResult, params: PhysicalParamters,
 
     cart_width = 0.4
     cart_height = 0.2
+    # Scale pole circle radius so that area is related to weight
+    pole_circle_radius = np.sqrt(cart_width * cart_height / pi * params.m / params.M)
 
     aspect_ratio = 9.0 / 16.0                                                   # height / width                
     y_lim = (-params.l * 0.4 - cart_height, params.l * 1.1 + cart_height)       # chosen arbitrarily
     x_lim = array([-0.5, 0.5])                                                  # symmetric x-axis
     x_lim *= (y_lim[1] - y_lim[0]) * 1 / aspect_ratio                           # scale to perserve aspect ratio
 
-    fig, ax = plt.subplots()
+    fig, axs = plt.subplot_mosaic([['left', 'h1'],
+                                   ['left', 'h2'],
+                                   ['left', 'h3']], layout='constrained')
+
+    fig.suptitle(f"Pole cart animation. Cart weight: {params.M} kg, pole weight {params.m} kg")
+
+    ax = axs["left"]                         # axs['left']] will be for animation
     ax.set_box_aspect(aspect_ratio)
     ax.set_xlim(*x_lim)
     ax.set_ylim(*y_lim)
@@ -46,7 +54,7 @@ def animate_simulation(sim_result: SimulationResult, params: PhysicalParamters,
     cart_patch = FancyBboxPatch((0, 0), cart_width, cart_height, 
                                 boxstyle='round, pad=0.05', fc=colors[0], ec=colors[1], lw=2) 
     pole_line, = ax.plot([], [], lw=6, color=colors[2], zorder=-1)
-    pole_circle = Circle((0, 0), radius=0.05, fc=colors[4], ec=colors[5], lw=2)
+    pole_circle = Circle((0, 0), radius=pole_circle_radius, fc=colors[4], ec=colors[5], lw=2)
 
     ax.add_patch(cart_patch)
     ax.add_patch(pole_circle)
@@ -84,8 +92,23 @@ def animate_simulation(sim_result: SimulationResult, params: PhysicalParamters,
                 progress.update(task, completed=curr_frame)
 
             anim.save(f'{save_path}.mp4', writer=writer, dpi=150, progress_callback=cb)
-        
+    
+    axs['h1'].set_title("Energy difference from t0")
+    axs['h1'].set_xlabel("Time [s]")
+    axs['h1'].set_ylabel("E0 - E(t) [J]")
+    axs['h1'].plot(sim_result.time_ts, sim_result.energy_ts[0] - sim_result.energy_ts)
+
+    axs['h2'].set_title("Cart position x(t)")
+    axs['h2'].set_xlabel("Time [s]")
+    axs['h2'].set_ylabel("x(t) [m]")
+    axs['h2'].plot(sim_result.time_ts, sim_result.x_ts)
+
+    axs['h3'].set_title("Pole angle theta(t)")
+    axs['h3'].set_xlabel("Time [s]")
+    axs['h3'].set_ylabel("theta(t) [rad]")
+    axs['h3'].plot(sim_result.time_ts, sim_result.theta_ts)
+
+
     plt.show()
 
     return anim
-

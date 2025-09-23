@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+﻿from dataclasses import dataclass
 
 import numpy as np
 from numpy import ndarray, array
@@ -10,22 +10,23 @@ class SimulationResult:
     dt: float
     time_ts: ndarray
     state_ts: ndarray
+    energy_ts: ndarray
 
     @property
     def x_ts(self) -> ndarray:
-        return self.states[:, 0]
+        return self.state_ts[:, 0]
 
     @property
     def x_dot_ts(self) -> ndarray:
-        return self.states[:, 1]
+        return self.state_ts[:, 1]
 
     @property
     def theta_ts(self) -> ndarray:
-        return self.states[:, 2]
+        return self.state_ts[:, 2]
 
     @property
     def theta_dot_ts(self) -> ndarray:
-        return self.states[:, 3]
+        return self.state_ts[:, 3]
 
 
 class Simulator:
@@ -55,7 +56,15 @@ class Simulator:
         state_ts = np.zeros((steps + 1, 4), dtype=float)
         state_ts[0] = initial_state
 
-        for k in range(steps):
-            state_ts[k + 1] = self.step(0.01, state_ts[k], 0, 0)
+        energy_ts = np.zeros(steps + 1, dtype=float)
+        energy_ts[0] = self.dynamics.calculate_energy(initial_state)
 
-        return SimulationResult(dt, time_ts, state_ts)
+        for k in range(steps):
+            state_ts[k + 1] = self.step(dt, state_ts[k], 0.0, 0.0)
+            energy_ts[k + 1] = self.dynamics.calculate_energy(state_ts[k + 1])
+
+        return SimulationResult(dt, time_ts, state_ts, energy_ts)
+
+
+
+
