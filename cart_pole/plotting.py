@@ -11,8 +11,8 @@ from matplotlib.patches import Circle, FancyBboxPatch
 import imageio_ffmpeg
 from rich.progress import Progress
 
-from simulation import SimulationResult
-from dynamics import PhysicalParamters
+from cart_pole.simulation import SimulationResult
+from cart_pole.dynamics import PhysicalParamters
 
 # Windows problem with FFMpegWriter
 mpl.rcParams['animation.ffmpeg_path'] = imageio_ffmpeg.get_ffmpeg_exe()

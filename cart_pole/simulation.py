@@ -1,9 +1,10 @@
-﻿from dataclasses import dataclass
+﻿#!/usr/bin/python3
+from dataclasses import dataclass
 
 import numpy as np
 from numpy import ndarray, array
 
-from dynamics import State, CartPoleDynamics
+from cart_pole.dynamics import State, CartPoleDynamics
 
 @dataclass(slots=True)
 class SimulationResult:
