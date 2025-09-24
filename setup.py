@@ -6,7 +6,8 @@ requirements = [
     'matplotlib',
     'imageio-ffmpeg',
     'scipy',
-    'rich'
+    'rich',
+    'sympy'
 ]
 
 setup(

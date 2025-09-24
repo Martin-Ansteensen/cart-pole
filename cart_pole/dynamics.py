@@ -1,8 +1,11 @@
 ﻿#!/usr/bin/python3
 from dataclasses import dataclass, asdict
+import pickle
+from pathlib import Path
 
 import numpy as np
 from numpy import cos, sin, ndarray, array
+import sympy as sp
 
 # Define state as type for nice typehinting. It will contain four numbers
 # (x, x_dot, theta, theta_dot).
@@ -31,6 +34,31 @@ class CartPoleDynamics:
         for attr, val in asdict(params).items():
             setattr(self, attr, val)
 
+        # Load the linearized dynamics
+        file_path = Path(__file__).parent / 'linearized_dynamics.pkl'
+        with open(file_path, 'rb') as f:
+            f_jacob:    sp.Matrix        # sympy expression for the jacboian of f
+            f_lin:      sp.Matrix        # sympy expression for the linearized dynamics
+            z:          sp.Matrix        # sympy symbols for state vector (x, x_dot, theta, theta_dot)
+            z0:         sp.Matrix        # sympy symbol for linearization point
+            data = pickle.load(f)
+        f_jacob = data['f_jacob']
+        f_lin = data['f_lin']
+        z = data['z']
+        z0 = data['z0']
+
+        # Evaluate the function with our know physical parameters
+        symbols = asdict(params).keys()
+        symbols = sp.symbols(' '.join(symbols))
+        values = asdict(params).values()
+        f_lin = f_lin.subs(zip(symbols, values))             # the physical parameters has the same name in the .ipynb and here
+        f_jacob = f_jacob.subs(zip(symbols, values))         # the physical parameters has the same name in the .ipynb and here
+
+        # Create a function from the sympy expression
+        F = sp.symbols('F')
+        self._lin_derivatives = sp.lambdify((F, *z, *z0), f_lin, 'numpy')
+        self._jacobian = sp.lambdify((F, *z), f_jacob, 'numpy')
+
     def derivatives(self, state: State, u: float, w: float = 0.0) -> State:
         '''Return the time-derivative of the state. Equations of motion taken from
         https://se.mathworks.com/help/symbolic/derive-and-simulate-cart-pole-system.html.
@@ -55,7 +83,7 @@ class CartPoleDynamics:
         # A is matrixM in Mathworks page
         A = array([
             [M + m,                  -l * m * cos(theta)],
-            [-l * m * cos(theta),     m * l ** 2 + I]
+            [-l * m * cos(theta),     m * l ** 2]
         ])
 
         # b is matrixF in Mathworks page, where dF (external force on pole) and friction is ignored
@@ -70,7 +98,7 @@ class CartPoleDynamics:
         return array([x_dot, x_ddot, theta_dot, theta_ddot], dtype=float)
 
     def calculate_energy(self, state: State) -> float:
-        """Total mechanical energy (kinetic + potential)."""
+        '''Total mechanical energy (kinetic + potential).'''
 
         _, x_dot, theta, theta_dot = state
 
@@ -87,3 +115,19 @@ class CartPoleDynamics:
         V = m * g * l * np.cos(theta)
 
         return T + V
+    
+    def linearized_derivatives(self, s: State, s0: State):
+        '''Return the linearized derivatives if the system about s0.
+        Basically a wrapper for the internal sympy lambdify function.
+        
+        Returns:
+            [x_dot, x_ddot, theta_dot, theta_ddot]
+        '''
+
+        # first z, then z0 (linearization point)
+        res = self._lin_derivatives(0, *s, *s0)
+        return res.ravel()
+
+    def jacobian(self, s0: State):
+        '''Calculate the jacobian of the system dynamics at s0'''
+        return self._jacobian(0, *s0)
