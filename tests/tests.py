@@ -4,7 +4,7 @@ import os
 import pickle
 
 import numpy as np
-import sympy
+import sympy as sp
 
 from cart_pole.dynamics import CartPoleDynamics, PhysicalParamters, State
 from cart_pole.simulation import Simulator
@@ -103,7 +103,7 @@ class TestSymbolicDynamics(unittest.TestCase):
     evaluate to the correct values'''
 
     def setUp(self):
-            self.pkl_path = 'cart_pole/linearized_dynamics.pkl'
+            self.pkl_path = 'cart_pole/dynamics.pkl'
 
     def test_file_exists(self):
         '''Verify that the pickle file exists before loading.'''
@@ -115,21 +115,12 @@ class TestSymbolicDynamics(unittest.TestCase):
         with open(self.pkl_path, 'rb') as f:
             data = pickle.load(f)
 
-        self.assertIn('f_jacob', data)
-        self.assertIn('f_lin', data)
-        self.assertIn('z', data)
-        self.assertIn('z0', data)
-
-    def test_linearized_dynamics(self):
-        '''Test that the linearized dynamics behave as expected. Need to put
-        in some hard coded tests as well'''
-        params = PhysicalParamters()
-        dynamics = CartPoleDynamics(params)
-        s: State  = np.ones(4)
-        s0: State = np.zeros(4)
-        lin_dev = dynamics.linearized_derivatives(s, s0)
-        jacobian = dynamics.jacobian(s0)
-        self.assertTrue(np.isclose(lin_dev, jacobian @ s).all())
+        self.assertIn('f', data)
+        self.assertIn('df_dz', data)
+        self.assertIn('df_du', data)
+        self.assertIn('u_symbol', data)
+        self.assertIn('w_symbol', data)
+        self.assertIn('state_symbols', data)
 
 if __name__ == '__main__':
     unittest.main()

@@ -7,7 +7,7 @@ import numpy as np
 from numpy import cos, sin, ndarray, array
 import sympy as sp
 
-# Define state as type for nice typehinting. It will contain four numbers
+# Define state as type for nice typehinting. It will contain four scalars
 # (x, x_dot, theta, theta_dot).
 State = ndarray
 
@@ -20,10 +20,10 @@ class PhysicalParamters:
     The system is not subject to friction
     '''
     M: float = 0.5      # cart mass (kg)
-    l: float = 1.0      # pole length (m)
-    m: float = 0.2      # tip mass (kg)
+    l: float = 1.5      # pole length (m)
+    m: float = 0.3      # tip mass (kg)
     g: float = 9.81     # gravity (m/s^2)
-    I: float = 0.0      # additional pole inertia about the hinge (kg·m^2)
+    I: float = 0.0      # additional pole inertia about the hinge
 
 
 class CartPoleDynamics:
@@ -33,73 +33,48 @@ class CartPoleDynamics:
         # params.x = v -> self.x = v
         for attr, val in asdict(params).items():
             setattr(self, attr, val)
+        self.load_dynamics(params)
 
-        # Load the linearized dynamics
-        file_path = Path(__file__).parent / 'linearized_dynamics.pkl'
+    def load_dynamics(self, params):
+        '''Load the dynamics in symbolic form. Replace the physical
+        constants with their numerical value, and create functions
+        to let us set the rest of symbols'''
+        file_path = Path(__file__).parent / 'dynamics.pkl'
         with open(file_path, 'rb') as f:
-            f_jacob:    sp.Matrix        # sympy expression for the jacboian of f
-            f_lin:      sp.Matrix        # sympy expression for the linearized dynamics
-            z:          sp.Matrix        # sympy symbols for state vector (x, x_dot, theta, theta_dot)
-            z0:         sp.Matrix        # sympy symbol for linearization point
             data = pickle.load(f)
-        f_jacob = data['f_jacob']
-        f_lin = data['f_lin']
-        z = data['z']
-        z0 = data['z0']
+
+        f = data['f']               # derivatives of all states
+        df_dz = data['df_dz']       # jacobian of f wrt. the state
+        df_du = data['df_du']       # jacobian of f wrt. the control action
 
         # Evaluate the function with our know physical parameters
-        symbols = asdict(params).keys()
-        symbols = sp.symbols(' '.join(symbols))
-        values = asdict(params).values()
-        f_lin = f_lin.subs(zip(symbols, values))             # the physical parameters has the same name in the .ipynb and here
-        f_jacob = f_jacob.subs(zip(symbols, values))         # the physical parameters has the same name in the .ipynb and here
+        # works as the physical parameters has the same name in the .ipynb and here
+        params_symbols = asdict(params).keys()
+        params_symbols = sp.symbols(' '.join(params_symbols))
+        params_values = asdict(params).values()
+
+        f = f.subs(zip(params_symbols, params_values))
+        df_dz = df_dz.subs(zip(params_symbols, params_values))
+        df_du = df_du.subs(zip(params_symbols, params_values))
+
+        # these symbols are needed to define the lambda functions
+        u = data['u_symbol']
+        w = data['w_symbol']
+        z = data['state_symbols']
 
         # Create a function from the sympy expression
-        F = sp.symbols('F')
-        self._lin_derivatives = sp.lambdify((F, *z, *z0), f_lin, 'numpy')
-        self._jacobian = sp.lambdify((F, *z), f_jacob, 'numpy')
+        self._f_func = sp.lambdify((*z, u, w), f, 'numpy')
+        self._df_dz_func = sp.lambdify((*z, u, w), df_dz, 'numpy')
+        self._df_du_func = sp.lambdify((*z, u, w), df_du, 'numpy')
 
-    def derivatives(self, state: State, u: float, w: float = 0.0) -> State:
-        '''Return the time-derivative of the state. Equations of motion taken from
-        https://se.mathworks.com/help/symbolic/derive-and-simulate-cart-pole-system.html.
-        https://en.wikipedia.org/wiki/Inverted_pendulum
-        Returns:
-            [x_dot, x_ddot, theta_dot, theta_ddot]
-        '''
-
-        # Unpack state
-        x, x_dot, theta, theta_dot = state
-
-        # Avoid self in all equations
-        m = self.m
-        M = self.M
-        l = self.l
-        I = self.I
-        g = self.g
-
-        # All external forces are the control action + disturbances
-        F = u + w       
-
-        # A is matrixM in Mathworks page
-        A = array([
-            [M + m,                  -l * m * cos(theta)],
-            [-l * m * cos(theta),     m * l ** 2]
-        ])
-
-        # b is matrixF in Mathworks page, where dF (external force on pole) and friction is ignored
-        b = array([
-            -l * m * sin(theta) * theta_dot ** 2 + F,
-            g * l * m * sin(theta)
-        ])        
-
-        # Solve for second derivative of x and theta
-        x_ddot, theta_ddot = np.linalg.solve(A, b)
-
-        return array([x_dot, x_ddot, theta_dot, theta_ddot], dtype=float)
+    def nonlinear_derivatives(self, state: State, u: float, w: float) -> State:
+        '''Return the time-derivative of the state using the the non-linear
+        dynamics. Refer to Jupyter Notebook for the equtions'''
+        res = self._f_func(*state, u, w)    # returned as a 2D array, want 1D
+        return res.ravel()
 
     def calculate_energy(self, state: State) -> float:
         '''Total mechanical energy (kinetic + potential).'''
-
         _, x_dot, theta, theta_dot = state
 
         m = self.m
@@ -115,19 +90,19 @@ class CartPoleDynamics:
         V = m * g * l * np.cos(theta)
 
         return T + V
-    
-    def linearized_derivatives(self, s: State, s0: State):
-        '''Return the linearized derivatives if the system about s0.
-        Basically a wrapper for the internal sympy lambdify function.
+
+    def nonlinear_state_jacobian(self, state: State, u: float, w: float) -> ndarray:
+        '''Calculate the jacobian of the non-linear system dynamics
+        wrt. the state.
         
-        Returns:
-            [x_dot, x_ddot, theta_dot, theta_ddot]
+        Returns: 4x4 array
         '''
+        return self._df_dz_func(*state, u, w)
 
-        # first z, then z0 (linearization point)
-        res = self._lin_derivatives(0, *s, *s0)
-        return res.ravel()
-
-    def jacobian(self, s0: State):
-        '''Calculate the jacobian of the system dynamics at s0'''
-        return self._jacobian(0, *s0)
+    def nonlinear_control_jacobian(self, state: State, u: float, w: float) -> ndarray:
+        '''Calculate the jacobian of the non-linear system dynamics
+        wrt. the control action.
+        
+        Returns: 4x1 array
+        '''
+        return self._df_du_func(*state, u, w)
