@@ -20,7 +20,7 @@ class PhysicalParamters:
     The system is not subject to friction
     '''
     M: float = 0.5      # cart mass (kg)
-    l: float = 1.5      # pole length (m)
+    l: float = 1      # pole length (m)
     m: float = 0.3      # tip mass (kg)
     g: float = 9.81     # gravity (m/s^2)
     I: float = 0.0      # additional pole inertia about the hinge
@@ -84,7 +84,7 @@ class CartPoleDynamics:
         g = self.g
 
         T = 0.5 * (M + m) * x_dot ** 2
-        T += -m * l * np.cos(theta) * x_dot * theta_dot
+        T += m * l * np.cos(theta) * x_dot * theta_dot
         T += 0.5 * (m * l ** 2) * theta_dot ** 2
 
         V = m * g * l * np.cos(theta)
