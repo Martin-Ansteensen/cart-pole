@@ -17,6 +17,10 @@ class SimulationResult:
     u_ts:       ndarray
 
     @property
+    def n(self) -> int:
+        return len(self.time_ts)
+
+    @property
     def x_ts(self) -> ndarray:
         return self.state_ts[:, 0]
 
