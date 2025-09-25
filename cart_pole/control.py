@@ -1,14 +1,17 @@
 #!/usr/bin/python3
 import numpy as np
-from numpy import ndarray, array
+from numpy import ndarray, array, pi
 from scipy import linalg
 
 from cart_pole.dynamics import CartPoleDynamics, State
 
 class Controller():
-    pass
+    def wrap_theta(self, state):
+        '''Wrap theta in the state so that it is in the range -pi, pi'''
+        state[2] = (state[2] + pi) % (2*pi) - pi
+        return state
 
-class LQRController():
+class LQRController(Controller):
     '''LQR controller as described in
     https://en.wikipedia.org/wiki/Linear%E2%80%93quadratic_regulator'''
     def __init__(self, dynamics: CartPoleDynamics, Q: ndarray, R: ndarray):
@@ -33,6 +36,7 @@ class LQRController():
     def control(self, state: State):
         '''Calculate the control action based on the state
         of the system'''
+        state = self.wrap_theta(state)
         error = state - self.target
         force = -(self.K @ error)[0]    # is a scalar, but is returned as a ndarray
         return force
