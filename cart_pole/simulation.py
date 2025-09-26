@@ -15,6 +15,7 @@ class SimulationResult:
     energy_ts:  ndarray
     controller: str
     u_ts:       ndarray
+    cntrler_type:       ndarray
 
     @property
     def n(self) -> int:
@@ -71,20 +72,25 @@ class Simulator:
         u_ts = np.zeros((steps + 1), dtype=float)        
         w_ts = np.zeros((steps + 1), dtype=float)
         
+        cntrler_type = np.zeros((steps + 1))
+
         for k in range(steps):
             # Only apply the controller if we have one
             if self.controller:
-                u = self.controller.control(state_ts[k])
+                u, u_type = self.controller.control(state_ts[k])
+                cntrler_type[k] = u_type
+
             else:
                 u = 0
             w = 0
             u_ts[k] = u
+
             w_ts[k] = w
             state_ts[k + 1] = self.step(dt, state_ts[k], u, w)
             energy_ts[k + 1] = self.dynamics.calculate_energy(state_ts[k + 1])
 
         return SimulationResult(dt, time_ts, state_ts, energy_ts, type(self.controller).__name__,
-                                u_ts)
+                                u_ts, cntrler_type)
 
 
 

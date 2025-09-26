@@ -13,6 +13,8 @@ from rich.progress import Progress
 
 from cart_pole.simulation import SimulationResult
 from cart_pole.dynamics import PhysicalParamters
+from cart_pole.control import *
+
 
 def visaualize_simulation(sim_result: SimulationResult, params: PhysicalParamters,
                           save_path: Path) -> None:
@@ -118,16 +120,27 @@ def make_plots(axs, sim_result: SimulationResult):
     axs['h4'].plot(sim_result.time_ts, sim_result.theta_dot_ts)
 
     if sim_result.controller != type(None).__name__:
-        axs['h5'].set_title("Control action u")
+        axs['h5'].set_title(f"Control action u using {sim_result.controller}")
         axs['h5'].set_xlabel("Time [s]")
         axs['h5'].set_ylabel("u")
-        axs['h5'].plot(sim_result.time_ts, sim_result.u_ts)
+
+        # plot lqr in red, energy-based controller
+        u_ts = sim_result.u_ts
+        u_type = sim_result.cntrler_type    # np.nan will result in no line
+        
+        axs['h5'].plot(sim_result.time_ts,
+                       np.where(u_type == Controller.get_idx_of_controller(LQRController.__name__), u_ts, np.nan), color='red', label='LQR')
+        axs['h5'].plot(sim_result.time_ts,
+                       np.where(u_type == Controller.get_idx_of_controller(EnergyBasedController.__name__), u_ts, np.nan), color='green', label='Energy Based')
+        axs['h5'].legend(loc='upper right')
+
     else:
         # Only plot energy when we have a conservative system
         axs['h5'].set_title("Energy difference from t0")
         axs['h5'].set_xlabel("Time [s]")
         axs['h5'].set_ylabel("E0 - E(t) [J]")
         axs['h5'].plot(sim_result.time_ts, sim_result.energy_ts[0] - sim_result.energy_ts)
+
 
 
 def save_figure(anim, anim_data, save_path):
