@@ -16,7 +16,7 @@ class Controller():
             Controller.controllers_map[name] = len(Controller.controllers_map) + 1
 
     @classmethod
-    def get_idx_of_controller(cls, name ):
+    def get_idx_of_controller(cls, name):
         '''Get index associated with a particular controller type'''
         return cls.controllers_map.get(name)
 
@@ -90,12 +90,14 @@ class EnergyBasedController(Controller):
         l = self.dynamics.l
         g = self.dynamics.g
 
-        energy = 0.5 * m * (l ** 2) * (theta_dot ** 2) + m * g * l * (1 + np.cos(theta))
-        target_energy = 2.0 * m * g * l
+        # Calculate kinetic and potential energy in the pole
+        energy = 0.5 * m * (l ** 2) * (theta_dot ** 2) + m * g * l * np.cos(theta)
+        target_energy = m * g * l
         energy_error = energy - target_energy
-        swing_velocity = -theta_dot * np.cos(theta)
-        energy_term = -self.ke * energy_error * swing_velocity
+        energy_term = -self.ke * theta_dot * np.cos(theta) * energy_error
 
+        # Try to keep the cart at rest in addition to increasing the
+        # pole's energy
         u = energy_term - self.kx * x - self.kdx * x_dot
         saturated = float(np.clip(u, -self.umax, self.umax))
         return saturated, Controller.get_idx_of_controller(type(self).__name__)

@@ -129,6 +129,8 @@ class TestSymbolicDynamics(unittest.TestCase):
         self.assertIn('f', data)
         self.assertIn('df_dz', data)
         self.assertIn('df_du', data)
+        self.assertIn('Ek', data)
+        self.assertIn('Ep', data)
         self.assertIn('u_symbol', data)
         self.assertIn('w_symbol', data)
         self.assertIn('state_symbols', data)

@@ -87,7 +87,7 @@ def animate_simulation(fig, ax, sim_result: SimulationResult, params: PhysicalPa
 
         cart_patch.set_x(x + cart_offset[0])                                    # Place center of cart at the x pos
         pivot = np.array([x, cart_height])                                      # Pivot of pole
-        pole_circle.center = pivot + params.l*array([sin(theta), cos(theta)])   # Center of pole circle
+        pole_circle.center = pivot + params.l*array([-sin(theta), cos(theta)])   # Center of pole circle
         pole_line.set_data(zip(pivot, pole_circle.center))                      # set x-data and y-data
         time_text.set_text(f't = {sim_result.time_ts[frame]:.2f} s')            # update time
         return cart_patch, pole_line, pole_circle, time_text

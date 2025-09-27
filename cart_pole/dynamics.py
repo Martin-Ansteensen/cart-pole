@@ -23,7 +23,6 @@ class PhysicalParamters:
     l: float = 1      # pole length (m)
     m: float = 0.3      # tip mass (kg)
     g: float = 9.81     # gravity (m/s^2)
-    I: float = 0.0      # additional pole inertia about the hinge
 
 
 class CartPoleDynamics:
@@ -46,6 +45,8 @@ class CartPoleDynamics:
         f = data['f']               # derivatives of all states
         df_dz = data['df_dz']       # jacobian of f wrt. the state
         df_du = data['df_du']       # jacobian of f wrt. the control action
+        Ek = data['Ek']             # kinetic energy
+        Ep = data['Ep']             # potential energy
 
         # Evaluate the function with our know physical parameters
         # works as the physical parameters has the same name in the .ipynb and here
@@ -56,6 +57,8 @@ class CartPoleDynamics:
         f = f.subs(zip(params_symbols, params_values))
         df_dz = df_dz.subs(zip(params_symbols, params_values))
         df_du = df_du.subs(zip(params_symbols, params_values))
+        Ek = Ek.subs(zip(params_symbols, params_values))
+        Ep = Ep.subs(zip(params_symbols, params_values))
 
         # these symbols are needed to define the lambda functions
         u = data['u_symbol']
@@ -66,6 +69,9 @@ class CartPoleDynamics:
         self._f_func = sp.lambdify((*z, u, w), f, 'numpy')
         self._df_dz_func = sp.lambdify((*z, u, w), df_dz, 'numpy')
         self._df_du_func = sp.lambdify((*z, u, w), df_du, 'numpy')
+        self._Ek_func = sp.lambdify(z, Ek, 'numpy')
+        self._Ep_func = sp.lambdify(z, Ep, 'numpy')
+
 
     def nonlinear_derivatives(self, state: State, u: float, w: float) -> State:
         '''Return the time-derivative of the state using the the non-linear
@@ -73,23 +79,11 @@ class CartPoleDynamics:
         res = self._f_func(*state, u, w)    # returned as a 2D array, want 1D
         return res.ravel()
 
+
     def calculate_energy(self, state: State) -> float:
-        '''Total mechanical energy (kinetic + potential).'''
-        _, x_dot, theta, theta_dot = state
+        '''Total mechanical energy (kinetic + potential)'''
+        return self._Ek_func(*state) + self._Ep_func(*state)
 
-        m = self.m
-        M = self.M
-        l = self.l
-        I = self.I
-        g = self.g
-
-        T = 0.5 * (M + m) * x_dot ** 2
-        T += m * l * np.cos(theta) * x_dot * theta_dot
-        T += 0.5 * (m * l ** 2) * theta_dot ** 2
-
-        V = m * g * l * np.cos(theta)
-
-        return T + V
 
     def nonlinear_state_jacobian(self, state: State, u: float, w: float) -> ndarray:
         '''Calculate the jacobian of the non-linear system dynamics
