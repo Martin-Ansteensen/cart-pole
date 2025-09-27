@@ -1,0 +1,93 @@
+{
+  "physical": {
+    "default": {
+      "M": 0.5,
+      "m": 0.3,
+      "l": 1.0,
+      "g": 9.81,
+      "I": 0.0
+    },
+    "heavy_cart": {
+      "M": 1.2,
+      "m": 0.3,
+      "l": 1.0,
+      "g": 9.81,
+      "I": 0.05
+    },
+    "long_pole": {
+      "M": 0.5,
+      "m": 0.25,
+      "l": 1.5,
+      "g": 9.81,
+      "I": 0.0
+    }
+  },
+  "controllers": {
+    "lqr": {
+      "default": {
+        "Q": [
+          [1.0, 0.0, 0.0, 0.0],
+          [0.0, 1.0, 0.0, 0.0],
+          [0.0, 0.0, 10.0, 0.0],
+          [0.0, 0.0, 0.0, 1.0]
+        ],
+        "R": [[1.0]]
+      },
+      "aggressive": {
+        "Q": [
+          [10.0, 0.0, 0.0, 0.0],
+          [0.0, 10.0, 0.0, 0.0],
+          [0.0, 0.0, 50.0, 0.0],
+          [0.0, 0.0, 0.0, 10.0]
+        ],
+        "R": [[0.5]]
+      },
+      "gentle": {
+        "Q": [
+          [0.2, 0.0, 0.0, 0.0],
+          [0.0, 0.2, 0.0, 0.0],
+          [0.0, 0.0, 2.0, 0.0],
+          [0.0, 0.0, 0.0, 0.2]
+        ],
+        "R": [[2.0]]
+      }
+    },
+    "energy": {
+      "default": {
+        "energy_gain": 15.0,
+        "position_gain": 2.0,
+        "velocity_gain": 2.5,
+        "umax": 100.0
+      },
+      "aggressive": {
+        "energy_gain": 25.0,
+        "position_gain": 1.0,
+        "velocity_gain": 1.5,
+        "umax": 150.0
+      },
+      "robust": {
+        "energy_gain": 12.5,
+        "position_gain": 4.0,
+        "velocity_gain": 4.5,
+        "umax": 80.0
+      }
+    },
+    "hybrid": {
+      "default": {
+        "lqr_profile": "default",
+        "energy_profile": "default",
+        "switching_angle": 0.4
+      },
+      "aggressive": {
+        "lqr_profile": "aggressive",
+        "energy_profile": "aggressive",
+        "switching_angle": 0.4
+      },
+      "robust": {
+        "lqr_profile": "gentle",
+        "energy_profile": "robust",
+        "switching_angle": 0.5
+      }
+    }
+  }
+}

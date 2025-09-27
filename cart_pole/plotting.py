@@ -16,22 +16,32 @@ from cart_pole.dynamics import PhysicalParamters
 from cart_pole.control import *
 
 
-def visaualize_simulation(sim_result: SimulationResult, params: PhysicalParamters,
-                          save_path: Path) -> None:
+def visualize_simulation(sim_result: SimulationResult, params: PhysicalParamters,
+                          plots: bool, save_path: Path) -> None:
     '''Visualize the simulation with relevant plots and an animation'''
-    # Create a tile based layout
-    fig, axs = plt.subplot_mosaic([['anim', 'h1'],
-                                   ['anim', 'h2'],
-                                   ['anim', 'h3'],
-                                   ['h5', 'h4']],
-                                   layout='constrained', figsize=(12, 8))
+    tile_layout = []
+    if plots:
+        # Create a tile based layout to have both animation and plots
+        tile_layout = [
+            ['anim', 'h1'],
+            ['anim', 'h2'],
+            ['anim', 'h3'],
+            ['h5', 'h4']
+        ]
+    else:
+        tile_layout = [['anim']]
 
-    fig.suptitle(f"Pole cart animation. Cart weight: {params.M} kg, pole weight {params.m} kg")
+    fig, axs = plt.subplot_mosaic(tile_layout,
+                                layout='constrained', figsize=(9, 6))
+
     anim, anim_data = animate_simulation(fig, axs["anim"], sim_result, params)
-    make_plots(axs, sim_result)
+    
+    if plots:
+        make_plots(axs, sim_result)
 
     if save_path:
         save_figure(anim, anim_data, save_path)
+    
     plt.show()
 
 
@@ -44,17 +54,17 @@ def animate_simulation(fig, ax, sim_result: SimulationResult, params: PhysicalPa
     # Scale pole circle radius so that area is related to weight
     pole_circle_radius = np.sqrt(cart_width * cart_height / pi * params.m / params.M)
 
-    aspect_ratio = 9.0 / 16.0                                                   # height / width                
-    y_lim = 2*array([-params.l * 0.4 - cart_height, params.l * 1.1 + cart_height])       # chosen arbitrarily
-    x_lim = array([-0.5, 0.5])                                                  # symmetric x-axis
-    x_lim *= (y_lim[1] - y_lim[0]) * 1 / aspect_ratio                           # scale to perserve aspect ratio
+    aspect_ratio = 9.0 / 16.0                                                           # height / width                
+    y_lim = 2*array([-params.l * 0.4 - cart_height, params.l * 1.1 + cart_height])      # chosen arbitrarily
+    x_lim = array([-0.5, 0.5])                                                          # symmetric x-axis
+    x_lim *= (y_lim[1] - y_lim[0]) * 1 / aspect_ratio                                   # scale to perserve aspect ratio
 
     ax.set_box_aspect(aspect_ratio)
     ax.set_xlim(*x_lim)
     ax.set_ylim(*y_lim)
     ax.set_xlabel('Cart position [m]')
     ax.set_ylabel('Height [m]')
-    ax.axhline(0.0, color='black', lw=2)
+    ax.axhline(0.0, color='black', lw=2, zorder=-2)
 
     # Origin of patch is in bottom left corner, so we need to offset it
     cart_offset = np.array([-cart_width / 2.0, 0.0])
@@ -132,7 +142,9 @@ def make_plots(axs, sim_result: SimulationResult):
                        np.where(u_type == Controller.get_idx_of_controller(LQRController.__name__), u_ts, np.nan), color='red', label='LQR')
         axs['h5'].plot(sim_result.time_ts,
                        np.where(u_type == Controller.get_idx_of_controller(EnergyBasedController.__name__), u_ts, np.nan), color='green', label='Energy Based')
-        axs['h5'].legend(loc='upper right')
+        
+        if sim_result.controller == HybdridController.__name__:
+            axs['h5'].legend(loc='upper right')
 
     else:
         # Only plot energy when we have a conservative system

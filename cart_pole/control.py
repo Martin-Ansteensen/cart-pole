@@ -5,44 +5,47 @@ from scipy import linalg
 
 from cart_pole.dynamics import CartPoleDynamics, State
 
+
 class Controller():
     controllers_map = {}    # assign a number to each controller
     def __init__(self):
-        '''Register each controller in the map'''
-        l = len(self.controllers_map)
-        name = self.__class__.__name__
-        Controller.controllers_map[name] = l + 1 
-    
-    def get_idx_of_controller(name):
-        '''Get index associated with a particular
-        controller type'''
-        return Controller.controllers_map.get(name)
+        '''Register each controller class with a numeric
+        identifier in the map'''
+        name = type(self).__name__
+        if name not in Controller.controllers_map:
+            Controller.controllers_map[name] = len(Controller.controllers_map) + 1
 
     @classmethod
-    def get_controller_of_idx(self, idx):
-        '''Get controller associated with index'''
-        for k, v in Controller.controllers_map.items():
+    def get_idx_of_controller(cls, name ):
+        '''Get index associated with a particular controller type'''
+        return cls.controllers_map.get(name)
+
+    @classmethod
+    def get_controller_of_idx(cls, idx):
+        '''Get controller name associated with an index'''
+        for k, v in cls.controllers_map.items():
             if v == idx:
                 return k
         return None
 
+    @classmethod
     def wrap_theta(self, state):
         '''Wrap theta in the state so that it is in the range -pi, pi'''
-        state[2] = (state[2] + pi) % (2*pi) - pi
+        state[2] = (state[2] + pi) % (2 * pi) - pi
         return state
+
 
 class LQRController(Controller):
     '''LQR controller as described in
     https://en.wikipedia.org/wiki/Linear%E2%80%93quadratic_regulator'''
+
     def __init__(self, dynamics: CartPoleDynamics, Q: ndarray, R: ndarray):
-        '''Calculate optimal gain K based on Q, R and the dynamics
-        of the system. The controller can only affect the cart position'''
+        '''Calculate optimal gain K based on Q, R and the dynamics of the system.'''
         super().__init__()
-        print(__name__)
         self.dynamics = dynamics
-        self.Q = Q
-        self.R = R
-            
+        self.Q = array(Q, dtype=float)
+        self.R = array(R, dtype=float)
+
         # We want to regulate about the upright position with
         # the cart in the center -> state 0 0 0 0
         self.target = np.zeros(4)
@@ -57,7 +60,7 @@ class LQRController(Controller):
     def control(self, state: State):
         '''Calculate the control action to bring the system to
         equilibrium based on the state of the system.
-        Retunrns the control force and the controllers name index.'''
+        Returns the control force and the controllers name index.'''
         state = self.wrap_theta(state)
         error = state - self.target
         force = -(self.K @ error)[0]    # is a scalar, but is returned as a ndarray
@@ -68,9 +71,8 @@ class EnergyBasedController(Controller):
     energy in the system. This can be used to bring the pole from
     the downwards position to the upwards position, but is not
     suited to keep the pole upright'''
-    def __init__(self, dynamics: CartPoleDynamics, energy_gain: float = 15.0,
-                 position_gain: float = 2.0, velocity_gain: float = 2.5,
-                 umax: float = 100.0):
+    def __init__(self, dynamics: CartPoleDynamics, energy_gain,
+                 position_gain, velocity_gain, umax):
         super().__init__()
 
         self.dynamics = dynamics
@@ -80,8 +82,10 @@ class EnergyBasedController(Controller):
         self.umax = umax
 
     def control(self, state: State):
-        state = self.wrap_theta(state)
-        x, x_dot, theta, theta_dot = state
+        '''Calculate the control action to increase the energy in
+        the system.
+        Returns the control force and the controllers name index.'''
+        x, x_dot, theta, theta_dot = self.wrap_theta(state)
         m = self.dynamics.m
         l = self.dynamics.l
         g = self.dynamics.g
@@ -93,20 +97,25 @@ class EnergyBasedController(Controller):
         energy_term = -self.ke * energy_error * swing_velocity
 
         u = energy_term - self.kx * x - self.kdx * x_dot
-        return float(np.clip(u, -self.umax, self.umax)), Controller.get_idx_of_controller(self.__class__.__name__)
+        saturated = float(np.clip(u, -self.umax, self.umax))
+        return saturated, Controller.get_idx_of_controller(type(self).__name__)
 
 
 class HybdridController(Controller):
-    def __init__(self, dynamics):
-        self.lqr = LQRController(dynamics, np.diag([1.0, 1.0, 10.0, 1.0]), np.array([[1]]))
-        self.swing_up = EnergyBasedController(dynamics)
+    '''Combine the LQR and eneergy based controller to get a hybrid
+    controller that can perform both swing up and balancing'''
+    def __init__(self, dynamics: CartPoleDynamics, lqr_kwargs, energy_kwargs,
+                 switching_angle = 0.4):
+        super().__init__()
+        lqr_kwargs = lqr_kwargs or {}
+        energy_kwargs = energy_kwargs or {}
+        self.lqr = LQRController(dynamics, **lqr_kwargs)
+        self.swing_up = EnergyBasedController(dynamics, **energy_kwargs)
+        self.switching_angle = switching_angle
 
     def control(self, state: State):
-        state = self.wrap_theta(state)
-        x, x_dot, theta, theta_dot = state
-
-        r = 0.4
-        if -r < theta < r:
+        '''Choose the appropiate controller, and let it control'''
+        theta = self.wrap_theta(state)[2]
+        if -self.switching_angle < theta < self.switching_angle:
             return self.lqr.control(state)
-        else:
-            return self.swing_up.control(state)
+        return self.swing_up.control(state)
