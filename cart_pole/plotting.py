@@ -157,16 +157,15 @@ def make_plots(axs, sim_result: SimulationResult):
 
 def save_figure(anim, anim_data, save_path):
     '''Save the plt figure as a mp4'''
-    # Windows problem with FFMpegWriter
     mpl.rcParams['animation.ffmpeg_path'] = imageio_ffmpeg.get_ffmpeg_exe()
 
-    fps = anim_data['fps']
+    fps = int(anim_data['fps'])
     n_frames = anim_data['n_frames']
-    writer = FFMpegWriter(fps=int(round(fps)), codec='h264', bitrate=1800)
+    writer = FFMpegWriter(fps=fps, codec='h264', bitrate=1800)
     with Progress() as progress:
         task = progress.add_task("Saving animation", total=n_frames)
         def cb(curr_frame: int, total_frames: int):
             '''Callback function to update progress bar for video saving'''
             progress.update(task, completed=curr_frame)
 
-        anim.save(f'{save_path}.mp4', writer=writer, dpi=150, progress_callback=cb)
+        anim.save(f'{save_path}_{fps}fps.mp4', writer=writer, dpi=150, progress_callback=cb)
