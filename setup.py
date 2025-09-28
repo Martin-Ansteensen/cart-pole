@@ -7,7 +7,10 @@ requirements = [
     'imageio-ffmpeg',
     'scipy',
     'rich',
-    'sympy'
+    'sympy',
+    'nbformat',
+    'nbclient',
+    'ipykernel'
 ]
 
 setup(
