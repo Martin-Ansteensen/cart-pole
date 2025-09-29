@@ -64,6 +64,12 @@ def parse_args() -> argparse.Namespace:
     )
 
     parser.add_argument(
+        '--trace-tip',
+        action='store_true',
+        help='Trace the tip of the pole in the animation',
+    )
+
+    parser.add_argument(
         '--save-path',
         type=Path,
         help='If provided, save the animation to the given path',
@@ -95,7 +101,7 @@ def main(args):
     result = simulator.run(initial_state=initial_state, duration=args.duration, dt=args.dt)
     print('Done simulating')
 
-    visualize_simulation(result, params, plots=args.plots, save_path=args.save_path)
+    visualize_simulation(result, params, plots=args.plots, trace=args.trace_tip, save_path=args.save_path)
 
     return 0
 

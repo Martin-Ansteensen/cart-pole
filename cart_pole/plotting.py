@@ -1,6 +1,7 @@
 #!/usr/bin/python3
 from dataclasses import dataclass
 from pathlib import Path
+from collections import deque
 
 import numpy as np
 from numpy import array, cos, sin, pi
@@ -17,7 +18,7 @@ from cart_pole.control import *
 
 
 def visualize_simulation(sim_result: SimulationResult, params: PhysicalParamters,
-                          plots: bool, save_path: Path) -> None:
+                          plots: bool, trace: bool, save_path: Path) -> None:
     '''Visualize the simulation with relevant plots and an animation'''
     tile_layout = []
     if plots:
@@ -34,7 +35,7 @@ def visualize_simulation(sim_result: SimulationResult, params: PhysicalParamters
     fig, axs = plt.subplot_mosaic(tile_layout,
                                 layout='constrained', figsize=(9, 6))
 
-    anim, anim_data = animate_simulation(fig, axs["anim"], sim_result, params)
+    anim, anim_data = animate_simulation(fig, axs["anim"], sim_result, params, trace)
     
     if plots:
         make_plots(axs, sim_result)
@@ -45,7 +46,8 @@ def visualize_simulation(sim_result: SimulationResult, params: PhysicalParamters
     plt.show()
 
 
-def animate_simulation(fig, ax, sim_result: SimulationResult, params: PhysicalParamters) -> FuncAnimation:
+def animate_simulation(fig, ax, sim_result: SimulationResult,
+                       params: PhysicalParamters, trace: bool) -> FuncAnimation:
     '''Animate a precomputed SimulationResult'''
     colors = mpl.cm.Paired.colors
 
@@ -76,8 +78,18 @@ def animate_simulation(fig, ax, sim_result: SimulationResult, params: PhysicalPa
     ax.add_patch(cart_patch)
     ax.add_patch(pole_circle)
 
+    # trace the pole tip for T s, contains tuples (x, y)
+    T = 2; n = int(T / sim_result.dt)
+    tip_trace = deque(maxlen=n)
+    tip_trace_line, = ax.plot([], [], lw=2, ls='--', color=colors[4])
+
     # Display time at the top of the axis
     time_text = ax.text(0.02, 0.95, '', transform=ax.transAxes)
+
+    def init_animation():
+        '''Initialization function for animation'''
+        tip_trace.clear()   # remove all datapoints in the trace
+        return cart_patch, pole_line, pole_circle, time_text, tip_trace_line
 
     def update(frame: int):
         '''Update function for animation called each frame'''
@@ -90,14 +102,18 @@ def animate_simulation(fig, ax, sim_result: SimulationResult, params: PhysicalPa
         pole_circle.center = pivot + params.l*array([-sin(theta), cos(theta)])   # Center of pole circle
         pole_line.set_data(zip(pivot, pole_circle.center))                      # set x-data and y-data
         time_text.set_text(f't = {sim_result.time_ts[frame]:.2f} s')            # update time
-        return cart_patch, pole_line, pole_circle, time_text
-
+        tip_trace.append(pole_circle.center)
+        if trace:
+            tip_trace_line.set_data(zip(*tip_trace))
+            
+        return cart_patch, pole_line, pole_circle, time_text, tip_trace_line
 
     # FPS to play back simulation in real time
     fps = 1 / sim_result.dt
     n_frames = len(sim_result.time_ts)
     anim = FuncAnimation(fig, update, frames=n_frames,
-                         interval=1000.0 / fps, blit=True)
+                         interval=1000.0 / fps, blit=True,
+                         init_func=init_animation)
     
     return anim, {'fps': fps, 'n_frames': n_frames}
 
