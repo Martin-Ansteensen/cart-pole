@@ -1,9 +1,11 @@
 #!/usr/bin/python3
 import json
 from pathlib import Path
+import pickle
 
 from cart_pole.control import EnergyBasedController, HybdridController, LQRController
 from cart_pole.dynamics import CartPoleDynamics, PhysicalParamters
+import cart_pole.q_learning as ql
 
 CONFIG_FILENAME = 'configs.json'
 DEFAULT_CONFIG_PATH = Path(__file__).with_name(CONFIG_FILENAME)
@@ -21,7 +23,7 @@ def load_config(path: Path):
     try:
         with target_path.open('r') as f:
             data = json.load(f)
-    except json.JSONDecodeError as e:
+    except json.JSONDecodeError:
         raise ConfigurationError(f'Failed to parse configuration file at {target_path}.')
 
     return data
@@ -75,10 +77,10 @@ def build_controller(config, controller_name, controller_profile, dynamics: Cart
     if controller_name == 'lqr':
         return LQRController(dynamics=dynamics, Q=profile_data['Q'], R=profile_data['R'])
 
-    if controller_name == 'energy':
+    elif controller_name == 'energy':
         return EnergyBasedController(dynamics=dynamics, **profile_data)
 
-    if controller_name == 'hybrid':
+    elif controller_name == 'hybrid':
         lqr_profile = profile_data['lqr_profile']
         energy_profile = profile_data['energy_profile']
         switching_angle = float(profile_data['switching_angle'])
@@ -93,4 +95,26 @@ def build_controller(config, controller_name, controller_profile, dynamics: Cart
             switching_angle=switching_angle
         )
 
+    elif controller_name == 'q_learning':
+        policy_path = DEFAULT_CONFIG_PATH.parent / 'policies' / f'{controller_profile}.pkl'
+
+        with open(policy_path, 'rb') as f:
+            unpickler = QLearningUnpickler(f)
+            data = unpickler.load()
+
+        policy =  data['policy']
+        return  ql.QLearningController(policy)
+
     raise ConfigurationError(f'Unsupported controller {controller_name}')
+
+# magic code
+# https://stackoverflow.com/questions/50465106/attributeerror-when-reading-a-pickle-file
+# error occurs because I run q_learning.py directly, and pickle classes defined in that file
+# would have been solved if I ran main.py
+# propsers other solution using copyreg
+class QLearningUnpickler(pickle.Unpickler):
+    def find_class(self, module, name):
+        if module in {'__main__', 'q_learning', 'cart_pole.q_learning'}:
+            if hasattr(ql, name):
+                return getattr(ql, name)
+        return super().find_class(module, name)

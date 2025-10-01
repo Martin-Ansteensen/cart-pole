@@ -193,24 +193,23 @@ def make_plots(axs, sim_result: SimulationResult):
         # We have a controller
         axs['h5'].set_title(f'Control action u using {sim_result.controller}')
         axs['h5'].set_ylabel('u')
-        
         u_ts = sim_result.u_ts
-        u_type = sim_result.cntrler_type    # np.nan will result in no line
-        # plot each controller in a different color. That way, if we are
-        # using the Hybrid controller we can distinguish when the LQR
-        # and energy controller are being used
-        lqr_type = Controller.get_idx_of_controller(LQRController.__name__)
-        energy_type = Controller.get_idx_of_controller(EnergyBasedController.__name__)
 
-        overlay = add_series(axs['h5'], time, np.where(u_type == lqr_type, u_ts, np.nan), color='r', label='LQR')
-        overlays.append(overlay)
-
-        overlay = add_series(axs['h5'], time, np.where(u_type == energy_type, u_ts, np.nan), color='g', label='Energy')
-        overlays.append(overlay)
-
-        # only add the legend if we are using the Hybrid controller
+        # if we are using the Hybrid controller we want to show which
+        # controller is being used at each timepoint
         if sim_result.controller == HybdridController.__name__:
+            u_type = sim_result.cntrler_type    # np.nan will result in no line
+            lqr_type = Controller.get_idx_of_controller(LQRController.__name__)
+            energy_type = Controller.get_idx_of_controller(EnergyBasedController.__name__)
+            overlay = add_series(axs['h5'], time, np.where(u_type == lqr_type, u_ts, np.nan), color='r', label='LQR')
+            overlays.append(overlay)
+            overlay = add_series(axs['h5'], time, np.where(u_type == energy_type, u_ts, np.nan), color='g', label='Energy')
+            overlays.append(overlay)
             axs['h5'].legend(loc='upper right', fontsize=5)
+
+        else:
+            overlay = add_series(axs['h5'], time, u_ts)
+            overlays.append(overlay)
 
     return overlays
 

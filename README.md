@@ -2,13 +2,22 @@
 
 A Python playground for studying the classic cart-pole problem with non-linear dynamics, energy control, linear-quadratic (LQR) balancing and reinforcement learning. The codebase lets you simulate different controller strategies, compare their behaviour, and export videos of the motion.
 
+## Highlight - Reinforcement learning
+Tabular Q-learning has been implemented from scratch, and trained to achieve a satisfactory performance. The trained policy balances the pole while keeping the cart near the origin. In contrast to the classical controller designs presented below, the Q-learning operates with a discretized state- and action space. It can only push the cart left or right with a fixed force, resulting in less smooth changes in the cart's states than for controllers operating with continous values.
+
+<div align="center">
+  <img src="media/highlight_q_learning_50fps.gif" width="100%" alt="Tabular Q-learning controller balancing the cart-pole" />
+</div>
+
+## System Overview
+
 The system we are dealing with is shown below. Positive $x$ is measured to the right along the track. The pole angle $\theta$ is measured counter-clockwise from the upright position. The <u>state</u> of the system captures its dynamics at any given point, and we conveniently store the state as a vector: $[x, \dot{x}, \theta, \dot{\theta}]$.
 
 <div align="center">
   <img src="media/state_reference.png" width="40%" alt="Cart-pole state definitions" />
 </div>
 
-## Controller Showcases
+## Classical Controllers
 Two contrasting initial conditions highlight how each controller behaves compared to the passive dynamics. 
 
 ### Near Upright (disturbed but recoverable)
@@ -55,8 +64,18 @@ Initial state `[0.1, -0.3, 2.8, -0.5]`. The cart begins almost at rest in the do
   </tr>
 </table>
 
-As can be seen from these two cases, the LQR and energy controllers are suited to handle different operating conditions. By combining them into one controller, the Hybdrid one, we get the best of both worlds. Below is a video showcasing the action applied by hybrid controller, where one clearly can see when the controller switches from LQR to energy based controlling:
-<img src="media/hybrid_plots_100fps.gif" width="100%" alt="Hybrid controller switching between energy and LQR plots" /></td>
+As can be seen from these two cases, the LQR and energy controllers are suited to handle different operating conditions. By combining them into one controller, the Hybdrid one, we get the best of both worlds. Below are one set of videos showing that the hybrid controller may offer a far better response than the LQR, even when the LQR controller manages to balance the pole. In addition, another video is showcasing the action applied by hybrid controller, where one clearly can see when the controller switches from energy based controlling to LQR:
+<table width="100%">
+  <tr>
+    <th>LQR</th>
+    <th>Hybrid</th>
+  </tr>
+  <tr>
+    <td><img src="media/lqr_almost_unstable_50fps.gif" width="100%" alt="LQR controller almost unstable controller from near-downward initial state" /></td>
+    <td><img src="media/hybrid_very_stable_50fps.gif" width="100%" alt="Hybrid controller" /></td>
+  </tr>
+</table>
+<img src="media/hybrid_plots_50fps.gif" width="100%" alt="Hybrid controller switching between energy and LQR plots" /></td>
 
 
 ## Features
@@ -93,23 +112,29 @@ As can be seen from these two cases, the LQR and energy controllers are suited t
   - `--plots` when you want plots in addition to the animation to gain more insight into simulation.
 
 ## Exporting Demonstration Videos
-- Supply a base filename with `--save-path`; the writer appends the playback FPS (for example `media/upright_lqr_100fps.mp4`).
-- Recreate videos in this README:
+- Supply a base filename with `--save-path`; the writer appends the playback FPS (for example `media/upright_lqr_50fps.mp4`).
+- Add `--trace-tip` to capture the dashed pole-tip trajectory that appears in the README clips.
+- Recreate the showcase animations:
   ```bash
-  # Near upright initial condition
-  python3 -m cart_pole.main --controller none --duration 8 --initial-state -2 1 0.5 0.6 --save-path media/upright_none
-  python3 -m cart_pole.main --controller lqr --duration 8 --initial-state -2 1 0.5 0.6 --save-path media/upright_lqr
-  python3 -m cart_pole.main --controller energy --duration 8 --initial-state -2 1 0.5 0.6 --save-path media/upright_energy
-  python3 -m cart_pole.main --controller hybrid --duration 8 --initial-state -2 1 0.5 0.6 --save-path media/upright_hybrid
+  # Near upright initial condition (trace enabled)
+  python3 -m cart_pole.main --controller none --duration 8 --initial-state -2 1 0.5 0.6 --trace-tip --save-path media/upright_none
+  python3 -m cart_pole.main --controller lqr --duration 8 --initial-state -2 1 0.5 0.6 --trace-tip --save-path media/upright_lqr
+  python3 -m cart_pole.main --controller energy --duration 8 --initial-state -2 1 0.5 0.6 --trace-tip --save-path media/upright_energy
+  python3 -m cart_pole.main --controller hybrid --duration 8 --initial-state -2 1 0.5 0.6 --trace-tip --save-path media/upright_hybrid
 
-  # Near downward initial condition
-  python3 -m cart_pole.main --controller none --duration 8 --initial-state 0.1 -0.3 2.8 -0.5 --save-path media/downright_none
-  python3 -m cart_pole.main --controller lqr --duration 8 --initial-state 0.1 -0.3 2.8 -0.5 --save-path media/downright_lqr
-  python3 -m cart_pole.main --controller energy --duration 8 --initial-state 0.1 -0.3 2.8 -0.5 --save-path media/downright_energy
-  python3 -m cart_pole.main --controller hybrid --duration 8 --initial-state 0.1 -0.3 2.8 -0.5 --save-path media/downright_hybrid
+  # Near downward initial condition (trace enabled)
+  python3 -m cart_pole.main --controller none --duration 8 --initial-state 0.1 -0.3 2.8 -0.5 --trace-tip --save-path media/downright_none
+  python3 -m cart_pole.main --controller lqr --duration 8 --initial-state 0.1 -0.3 2.8 -0.5 --trace-tip --save-path media/downright_lqr
+  python3 -m cart_pole.main --controller energy --duration 8 --initial-state 0.1 -0.3 2.8 -0.5 --trace-tip --save-path media/downright_energy
+  python3 -m cart_pole.main --controller hybrid --duration 8 --initial-state 0.1 -0.3 2.8 -0.5 --trace-tip --save-path media/downright_hybrid
 
-  # Animation with plots
-  python3 -m cart_pole.main --controller hybrid --duration 4 --initial-state -3 2 1.8  2 --plots --save-path ./media/hybrid_plots
+  # Hybrid controller with plots
+  python3 -m cart_pole.main --controller lqr --duration 5 --initial-state 3 1 1.1 0 --trace-tip --save-path media/lqr_almost_unstable
+  python3 -m cart_pole.main --controller hybrid --duration 5 --initial-state 3 1 1.1 0 --trace-tip --save-path media/hybrid_very_stable
+  python3 -m cart_pole.main --controller hybrid --duration 4 --initial-state -3 2 1.8 2 --plots --trace-tip --save-path media/hybrid_plots
+
+  # Tabular Q-learning highlight
+  python3 -m cart_pole.main --controller q_learning --duration 6 --initial-state 1.2 0.1 0.2 0.1 --plots --trace-tip --save-path media/highlight_q_learning
   ```
 
 ## Testing

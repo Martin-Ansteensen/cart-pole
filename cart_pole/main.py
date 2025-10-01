@@ -28,7 +28,7 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         '--controller',
-        choices=['none', 'lqr', 'energy', 'hybrid'],
+        choices=['none', 'lqr', 'energy', 'hybrid', 'q_learning'],
         default='none',
         help='Controller strategy to run during the simulation',
     )
@@ -46,7 +46,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         '--dt',
         type=float,
-        default=0.01,
+        default=0.02,
         help='Simulation timestep',
     )
     parser.add_argument(
@@ -109,3 +109,4 @@ def main(args):
 if __name__ == '__main__':
     args = parse_args()
     main(args)
+
