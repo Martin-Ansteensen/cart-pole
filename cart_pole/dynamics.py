@@ -4,8 +4,9 @@ import pickle
 from pathlib import Path
 
 import numpy as np
-from numpy import cos, sin, ndarray, array
+from numpy import pi, ndarray
 import sympy as sp
+
 
 # Define state as type for nice typehinting. It will contain four scalars
 # (x, x_dot, theta, theta_dot).
@@ -100,3 +101,9 @@ class CartPoleDynamics:
         Returns: 4x1 array
         '''
         return self._df_du_func(*state, u, w)
+
+
+def wrap_state(state: State):
+    '''Wrap theta in the state so that it is in the range -pi, pi'''
+    state[2] = (state[2] + pi) % (2 * pi) - pi
+    return state
