@@ -17,9 +17,15 @@ setup(
     name='cart-pole',
     description='Simulation and visualization for the cart-pole system.',
     use_scm_version=True,
-    setup_requires=["setuptools_scm"],
+    setup_requires=['setuptools_scm'],
     packages=find_packages(),
-    author="Martin Ansteensen",
+    author='Martin Ansteensen',
     python_requires='>=3.8',
-    install_requires=requirements
+    install_requires=requirements,
+    entry_points={
+        'console_scripts':[
+            'cart-pole-run=cart_pole.main:main',
+            'cart-pole-train-q=cart_pole.q_learning:parse_args'
+        ]
+    }
 )

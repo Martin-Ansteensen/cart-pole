@@ -28,7 +28,7 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         '--controller',
-        choices=['none', 'lqr', 'energy', 'hybrid', 'q_learning'],
+        choices=['none', 'lqr', 'energy', 'hybrid', 'q_learning', 'dqn'],
         default='none',
         help='Controller strategy to run during the simulation',
     )
@@ -83,7 +83,8 @@ def parse_args() -> argparse.Namespace:
 
     return parser.parse_args()
 
-def main(args):
+def main():
+    args = parse_args()
     config = cnfg.load_config(args.config)
 
     if args.list:
@@ -107,6 +108,4 @@ def main(args):
 
 
 if __name__ == '__main__':
-    args = parse_args()
-    main(args)
-
+    main()

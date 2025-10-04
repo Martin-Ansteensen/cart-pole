@@ -172,9 +172,9 @@ def save_policy(name: str, seed: int, eps_lengths: list, eps_rewards: list,
                 policy: QLearningPolicy, training_params: TrainingParameters,
                 env_params: EnvironmetParameters, physical_params) -> None:
     '''Pickle the policy and some data, register policy in config'''
-    path = Path(__file__).resolve().parent / 'policies' / f'{name}.pkl'
+    file_path = Path(__file__).resolve().parent 
     
-    with open(path, 'wb') as f:
+    with open(file_path/ 'policies' / f'{name}.pkl', 'wb') as f:
         pickle.dump({
             'seed': seed,
             'episode_lengths': eps_lengths,
@@ -187,11 +187,11 @@ def save_policy(name: str, seed: int, eps_lengths: list, eps_rewards: list,
     )
         
     # register controller in config
-    with open('configs.json', 'r') as f:
+    with open(file_path / 'configs.json', 'r') as f:
         config = json.load(f)
     config['controllers']['q_learning'][name] = {}
 
-    with open('configs.json', 'w') as f:
+    with open(file_path / 'configs.json', 'w') as f:
         json.dump(config, f, indent=2)
 
 
