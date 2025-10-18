@@ -25,7 +25,8 @@ setup(
     entry_points={
         'console_scripts':[
             'cart-pole-run=cart_pole.main:main',
-            'cart-pole-train-q=cart_pole.q_learning:parse_args'
+            'cart-pole-train-q=cart_pole.q_learning:parse_args',
+            'cart-pole-train-dqn=cart_pole.dqn:parse_args'
         ]
     }
 )

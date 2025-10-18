@@ -6,6 +6,8 @@ import pickle
 from cart_pole.control import EnergyBasedController, HybdridController, LQRController
 from cart_pole.dynamics import CartPoleDynamics, PhysicalParamters
 import cart_pole.q_learning as ql
+import cart_pole.dqn as dqn
+
 
 CONFIG_FILENAME = 'configs.json'
 DEFAULT_CONFIG_PATH = Path(__file__).with_name(CONFIG_FILENAME)
@@ -14,7 +16,7 @@ class ConfigurationError(RuntimeError):
     '''Raised when a configuration file is missing or malformed.'''
 
 
-def load_config(path: Path):
+def load_config(path: Path) -> dict:
     '''Load a JSON configuration file containing simulation presets.'''
     target_path = Path(path) if path else DEFAULT_CONFIG_PATH
     if not target_path.exists():
@@ -102,8 +104,15 @@ def build_controller(config, controller_name, controller_profile, dynamics: Cart
             unpickler = QLearningUnpickler(f)
             data = unpickler.load()
 
-        policy =  data['policy']
-        return  ql.QLearningController(policy)
+        policy = data['policy']
+        return ql.QLearningController(policy)
+
+    elif controller_name == 'dqn':
+        policy_path = DEFAULT_CONFIG_PATH.parent / 'policies' / f'{controller_profile}.pt'
+
+        trained_policy = dqn.load_policy(policy_path)
+        return dqn.DQNController(trained_policy)
+
 
     raise ConfigurationError(f'Unsupported controller {controller_name}')
 

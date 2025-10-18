@@ -161,6 +161,12 @@
     "q_learning": {
       "default": {},
       "q1": {}
+    },
+    "dqn": {
+      "default": {},
+      "100eps": {},
+      "200eps": {},
+      "300eps": {}
     }
   }
 }
