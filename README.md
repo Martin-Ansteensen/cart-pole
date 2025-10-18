@@ -6,6 +6,7 @@ This repository is a Python playground for the cart-pole system. The majority of
 The primary focus of the repo is to prototype and compare controllers that balance the pole upright, a non trivial problem because the upright configuration is an unstable equilibrium (see below). Implemented approaches include:
 - [Reinforcement learning (RL)](#rl)
   - Q-learning
+  - Deep Q-Network (DQN)
 - [Classical controllers](#classical-controllers)
   - Linear quadratic regulator (LQR)
   - Energy-based controlling
@@ -27,10 +28,19 @@ The primary focus of the repo is to prototype and compare controllers that balan
 Reinforcement learning is a branch of machine learning where an agent learns a policy (a decision-making rule) by interacting with an environment, receiving feedback through rewards and improving via trial and error.
 
 ### Q-learning <a name="q-learning"></a>
-I implemented tabular Q-learning from scratch and trained it to balance the pole while keeping the cart near the origin. Unlike classical controllers, the Q-learning agent uses discretized state and action spaces. It can apply only a fixed force to the left or right, which yields less smooth trajectories than controllers with continuous actions.
+I implemented tabular Q-learning from scratch and trained it to balance the pole while keeping the cart near the origin. Unlike classical controllers, the Q-learning agent uses discretized state and action spaces. It can apply only a fixed force to the left or right, which yields less smooth trajectories than controllers with continuous actions. Below is a Q-learning policy with two actions, trying to handle the initial state
+`[1.2, 0.1, 0.2, 0.1 ]`.
 
 <div align="center">
   <img src="media/highlight_q_learning_50fps.gif" width="100%"/>
+</div>
+
+### Deep Q-Network (DQN)
+The DQN agent uses a neural network to approximate the Q-function over a continuous state space, in contrast to Q-learning which operates with a discrete state space, while still having a discrete set of actions to choose from. DQN is better suited to handle more actions and therefore it is able to control the cart more smoothly. Below is a DQN policy trained with four actions, trying to handle the initial state
+`[3, 0, 0.8, 0]`.
+
+<div align="center">
+  <img src="media/dqn_highlight_50fps.gif" width="100%"/>
 </div>
 
 ## Classical Controllers <a name="classical-controllers"></a>
@@ -135,24 +145,27 @@ As can be seen from these two cases, the LQR and energy controllers are suited t
   - `--plots` when you want plots in addition to the animation to gain more insight into simulation.
 
   To get help with training new Q-learning policies, run:
-    ```bash
-  cart-pole-train-q --help
+  ```bash
+  cart-pole-train-q train --help
+  ```
+  The same applies for DQN:
+  ```bash
+  cart-pole-train-dqn train --help
   ```
   All of the training parameters are not exposed through the CLI, so if you want to tune those you need to change the code.
 
 
 ## Exporting Demonstration Videos
-- Supply a base filename with `--save-path`; the writer appends the playback FPS (for example `media/upright_lqr_50fps.mp4`).
-- Add `--trace-tip` to capture the dashed pole-tip trajectory that appears in the README clips.
+- Supply a path (with filename, but no extension) with `--save-path`
 - Recreate the showcase animations:
   ```bash
-  # Near upright initial condition (trace enabled)
+  # Near upright initial condition
   cart-pole-run --controller none --duration 8 --initial-state -2 1 0.5 0.6 --trace-tip --save-path media/upright_none
   cart-pole-run --controller lqr --duration 8 --initial-state -2 1 0.5 0.6 --trace-tip --save-path media/upright_lqr
   cart-pole-run --controller energy --duration 8 --initial-state -2 1 0.5 0.6 --trace-tip --save-path media/upright_energy
   cart-pole-run --controller hybrid --duration 8 --initial-state -2 1 0.5 0.6 --trace-tip --save-path media/upright_hybrid
 
-  # Near downward initial condition (trace enabled)
+  # Near downward initial condition
   cart-pole-run --controller none --duration 8 --initial-state 0.1 -0.3 2.8 -0.5 --trace-tip --save-path media/downright_none
   cart-pole-run --controller lqr --duration 8 --initial-state 0.1 -0.3 2.8 -0.5 --trace-tip --save-path media/downright_lqr
   cart-pole-run --controller energy --duration 8 --initial-state 0.1 -0.3 2.8 -0.5 --trace-tip --save-path media/downright_energy
@@ -165,6 +178,9 @@ As can be seen from these two cases, the LQR and energy controllers are suited t
 
   # Tabular Q-learning
   cart-pole-run --controller q_learning --duration 6 --initial-state 1.2 0.1 0.2 0.1 --plots --trace-tip --save-path media/highlight_q_learning
+
+  # Deep Q-Network
+  cart-pole-run --controller dqn --duration 8 --dt 0.02 --initial-state 3 0 0.8 0 --plots --trace --save-path media/dqn_highlight
   ```
 
 ## Testing
