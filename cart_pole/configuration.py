@@ -3,7 +3,7 @@ import json
 from pathlib import Path
 import pickle
 
-from cart_pole.control import EnergyBasedController, HybdridController, LQRController
+from cart_pole.control import EnergyBasedController, HybdridController, LQRController, ModelPredictiveController
 from cart_pole.dynamics import CartPoleDynamics, PhysicalParamters
 import cart_pole.q_learning as ql
 import cart_pole.dqn as dqn
@@ -113,6 +113,8 @@ def build_controller(config, controller_name, controller_profile, dynamics: Cart
         trained_policy = dqn.load_policy(policy_path)
         return dqn.DQNController(trained_policy)
 
+    elif controller_name == 'nmpc':
+        return ModelPredictiveController(dynamics)
 
     raise ConfigurationError(f'Unsupported controller {controller_name}')
 

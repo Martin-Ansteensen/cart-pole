@@ -28,7 +28,7 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         '--controller',
-        choices=['none', 'lqr', 'energy', 'hybrid', 'q_learning', 'dqn'],
+        choices=['none', 'lqr', 'energy', 'hybrid', 'q_learning', 'dqn', 'nmpc'],
         default='none',
         help='Controller strategy to run during the simulation',
     )

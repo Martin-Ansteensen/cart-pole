@@ -3,9 +3,9 @@ from dataclasses import dataclass, asdict
 import pickle
 from pathlib import Path
 
-import numpy as np
 from numpy import pi, ndarray
 import sympy as sp
+import casadi as ca
 
 
 # Define state as type for nice typehinting. It will contain four scalars
@@ -61,10 +61,16 @@ class CartPoleDynamics:
         Ek = Ek.subs(zip(params_symbols, params_values))
         Ep = Ep.subs(zip(params_symbols, params_values))
 
-        # these symbols are needed to define the lambda functions
+        # the symbols are needed to define the lambda functions and
+        # to convert sympy dynamics into a symbolic casadi expression
         u = data['u_symbol']
         w = data['w_symbol']
         z = data['state_symbols']
+
+        self.z_symbols = z
+        self.u_symbol = u
+        self.w_symbol = w
+        self.f_sympy = f
 
         # Create a function from the sympy expression
         self._f_func = sp.lambdify((*z, u, w), f, 'numpy')
@@ -102,6 +108,37 @@ class CartPoleDynamics:
         '''
         return self._df_du_func(*state, u, w)
 
+
+    def sympy_to_casadi(self, sympy_expr, sympy_vars):
+        casadi_expr = sp.lambdify(sympy_vars, sympy_expr, modules=[ca, {'ImmutableDenseMatrix': ca.blockcat}])
+        return casadi_expr
+
+    def casadi_dynamics(self, jit: bool = True) -> ca.Function:
+        z = ca.MX.sym('z', 4)
+        u = ca.MX.sym('u')
+        w = ca.MX.sym('w')
+        sympy_symbols = [self.z_symbols[i] for i in range(4)]
+        sympy_symbols += [self.u_symbol, self.w_symbol]
+
+        f_casadi = self.sympy_to_casadi(self.f_sympy, sympy_symbols)
+        casadi_vars = [
+        z[0],
+        z[1],
+        z[2],
+        z[3],
+        u,
+        w,
+        ]
+        x_dot = f_casadi(*casadi_vars)
+        self._f_casadi_func = ca.Function(
+            'cartpole_f',       # function name
+            [z, u, w],          # input variables
+            [x_dot],         # output variables
+            ['z', 'u', 'w'],    # input names
+            ['z_dot'],          # output names
+            {'jit': jit}            
+        )
+        return self._f_casadi_func
 
 def wrap_state(state: State):
     '''Wrap theta in the state so that it is in the range -pi, pi'''
