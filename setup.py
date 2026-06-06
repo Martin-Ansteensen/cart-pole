@@ -10,7 +10,8 @@ requirements = [
     'sympy',
     'nbformat',
     'nbclient',
-    'ipykernel'
+    'ipykernel',
+    'casadi'
 ]
 
 setup(
