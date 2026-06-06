@@ -126,7 +126,7 @@ class HybdridController(Controller):
 
 class ModelPredictiveController(Controller):
     '''Nonlinear MPC using CasADi'''
-    def __init__(self, dynamics: CartPoleDynamics, Q: np.array, R: float, dt: float, N: int, z_max: np.array, u_max: float):
+    def __init__(self, dynamics: CartPoleDynamics, Q: np.array, R: float, dt: float, N: int, z_max: np.array, u_max: float, q_du: float):
         super().__init__()
 
         self.dynamics = dynamics
@@ -138,6 +138,7 @@ class ModelPredictiveController(Controller):
         self.z_max = z_max  # bound on states
 
         self.Q = Q          # state cost matrix
+        self.q_du = q_du    # cost for changes in u
         self.R = R          # input cost matrix
         
         # Terminal cost calculations, use LQR solution about upright equilibrium
@@ -200,7 +201,15 @@ class ModelPredictiveController(Controller):
         for k in range(self.N):
             e_k = X[:, k]           # we have 0 as objective for all state variables
             u_k = U[:, k]
-            objective += ca.mtimes([e_k.T, q, e_k]) + self.R * ca.dot(u_k, u_k)            
+            objective += ca.mtimes([e_k.T, q, e_k]) + self.R * ca.dot(u_k, u_k)
+            
+            # penalize changes in input (smoothen input)
+            if k == 0:
+                delta_u = u_k - 0
+            else:
+                delta_u = u_k - U[:, k - 1]
+            objective += self.q_du * delta_u * delta_u
+
             constraints.append(X[:, k + 1] - self._rk4_symbolic(X[:, k], u_k))
         
         e_terminal = X[:, self.N]

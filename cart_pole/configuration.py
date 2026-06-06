@@ -118,7 +118,7 @@ def build_controller(config, controller_name, controller_profile, dynamics: Cart
     elif controller_name == 'nmpc':
         return ModelPredictiveController(
             dynamics, np.diag(profile_data["Q"]), profile_data["R"], profile_data["dt"], profile_data["N"],
-            np.array(profile_data["z_max"], dtype=float), profile_data["u_max"])
+            np.array(profile_data["z_max"], dtype=float), profile_data["u_max"], profile_data["q_du"])
 
     raise ConfigurationError(f'Unsupported controller {controller_name}')
 
