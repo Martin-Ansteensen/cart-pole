@@ -126,34 +126,34 @@ class HybdridController(Controller):
 
 class ModelPredictiveController(Controller):
     '''Nonlinear MPC using CasADi'''
-    def __init__(self, dynamics, dt: float = 0.02, N: int = 50):
+    def __init__(self, dynamics: CartPoleDynamics, Q: np.array, R: float, dt: float, N: int, z_max: np.array, u_max: float):
         super().__init__()
 
         self.dynamics = dynamics
-        self.dt = dt
-        
-        self.N = N
-        self.nx = 4
-        self.nu = 1
-        self.u_max = 50.0
-        self.z_max = np.array([4, np.inf, np.inf, np.inf], dtype=float)
+        self.dt = dt        # timestep when simulating prediction horizon
+        self.N = N          # size of prediction horizon
+        self.nx = 4         # number of states
+        self.nu = 1         # number of inputs
+        self.u_max = u_max  # bound on input
+        self.z_max = z_max  # bound on states
 
-        self.Q = np.diag([4.0, 1.0, 10.0, 1.0])
-        self.R = 0.1
+        self.Q = Q          # state cost matrix
+        self.R = R          # input cost matrix
         
-        # Terminal cost calculations
+        # Terminal cost calculations, use LQR solution about upright equilibrium
         target = np.zeros(4, dtype=float)
         A = self.dynamics.nonlinear_state_jacobian(target, 0, 0)
         B = self.dynamics.nonlinear_control_jacobian(target, 0, 0)
         self.P_terminal = linalg.solve_continuous_are(A, B, self.Q, self.R)
         
+        # Size calcualtions for MPC problem
         self.num_x = self.nx * (self.N + 1)
         self.num_u = self.nu * self.N
         self.nz = self.num_x + self.num_u
         self.num_constraints = self.nx * (self.N + 1)
-
         self._build_nlp()
 
+        # Will be updated as we do iterations
         self.x_guess = np.zeros((self.N + 1, self.nx), dtype=float)
         self.u_guess = np.zeros((self.nu, self.N), dtype=float)
         self.dual_bounds_guess = np.zeros(self.nz, dtype=float)
@@ -238,8 +238,8 @@ class ModelPredictiveController(Controller):
         ])
 
 
-
     def _rollout(self, state: State, u_sequence: ndarray) -> ndarray:
+        '''Simulate solution based on the current state and a sequence of inputs'''
         x_sequence = np.zeros((self.N + 1, self.nx), dtype=float)
         x_sequence[0] = state
         for k in range(self.N):
@@ -247,6 +247,7 @@ class ModelPredictiveController(Controller):
         return x_sequence
 
     def _unpack_solution(self, z: ndarray):
+        '''Unpack the solution given by casadi'''
         x_vec = z[:self.num_x]
         u_vec = z[self.num_x:]
         x_sequence = x_vec.reshape((self.nx, self.N + 1), order='F').T
@@ -264,6 +265,7 @@ class ModelPredictiveController(Controller):
         u_vec = self.u_guess.reshape(-1, order='F')
 
         decision_variable_guess = np.concatenate([x_vec, u_vec])
+        # system dynamics are constraints which have to be met exactly
         constraint_lower_bounds = np.zeros(self.num_constraints, dtype=float)
         constraint_upper_bounds = np.zeros(self.num_constraints, dtype=float)
 
@@ -280,6 +282,11 @@ class ModelPredictiveController(Controller):
             lam_x0=self.dual_bounds_guess,
             lam_g0=self.dual_constraints_guess,
         )
+        stats = self.nlp_solver.stats()
+        # should probably do some error handling here
+        # print(stats["return_status"])
+        # print(stats["success"])
+
         z_opt = np.array(solution['x'], dtype=float).ravel()
         if not np.all(np.isfinite(z_opt)):
             raise RuntimeError('NLP returned non-finite solution.')
