@@ -176,9 +176,10 @@
         "dt": 0.02,
         "z_max": [4.0, "inf", "inf", "inf"],
         "u_max": 35,
-        "q_du": 0.1
+        "q_du": 0.1,
+        "lqr_profile": "default",
+        "lqr_state_bounds": [2, 5, 0.4, 5] 
       }
      }
-   
   }
 }

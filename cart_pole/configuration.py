@@ -116,9 +116,13 @@ def build_controller(config, controller_name, controller_profile, dynamics: Cart
         return dqn.DQNController(trained_policy)
 
     elif controller_name == 'nmpc':
+        lqr_profile = profile_data['lqr_profile']
+        lqr_presets = controllers_section['lqr'][lqr_profile]
+
         return ModelPredictiveController(
             dynamics, np.diag(profile_data["Q"]), profile_data["R"], profile_data["dt"], profile_data["N"],
-            np.array(profile_data["z_max"], dtype=float), profile_data["u_max"], profile_data["q_du"])
+            np.array(profile_data["z_max"], dtype=float), profile_data["u_max"], profile_data["q_du"],
+            profile_data["lqr_state_bounds"], lqr_kwargs={'Q': lqr_presets['Q'], 'R': lqr_presets['R']})
 
     raise ConfigurationError(f'Unsupported controller {controller_name}')
 

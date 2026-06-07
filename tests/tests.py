@@ -203,7 +203,9 @@ class TestModelPredictiveController(TestController, unittest.TestCase):
     def create_controller(self):
         return ModelPredictiveController(
             dynamics=self.dynamics, Q=np.diag([4.0, 1.0, 10.0, 1.0]), R=0.1, dt=0.02, N=50,
-            z_max=np.array([4.0, np.inf, np.inf, np.inf]), u_max=40.0, q_du=1.0)
+            z_max=np.array([4.0, np.inf, np.inf, np.inf]), u_max=40.0, q_du=1.0,
+            lqr_state_bounds=[2, 5, 0.4, 5],
+            lqr_kwargs={'Q': np.diag([1.0, 1.0, 1.0, 20.0]), 'R': array([[0.1]])})
 
 class TestNotebookArtifact(unittest.TestCase):
     '''The notebook produces a .pkl file containing the dynamics of the system,

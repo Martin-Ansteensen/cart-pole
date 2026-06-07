@@ -126,8 +126,10 @@ class HybdridController(Controller):
 
 class ModelPredictiveController(Controller):
     '''Nonlinear MPC using CasADi'''
-    def __init__(self, dynamics: CartPoleDynamics, Q: np.array, R: float, dt: float, N: int, z_max: np.array, u_max: float, q_du: float):
+    def __init__(self, dynamics: CartPoleDynamics, Q: np.array, R: float, dt: float, N: int, z_max: np.array, u_max: float, q_du: float, lqr_state_bounds: list, lqr_kwargs: dict):
         super().__init__()
+        self.lqr = LQRController(dynamics, **lqr_kwargs)
+        self.lqr_state_bounds = lqr_state_bounds
 
         self.dynamics = dynamics
         self.dt = dt        # timestep when simulating prediction horizon
@@ -314,6 +316,8 @@ class ModelPredictiveController(Controller):
 
     def control(self, state: State):
         state = self.wrap_theta(state).astype(float)
+        if (np.abs(state) < self.lqr_state_bounds).all():
+            return self.lqr.control(state)
 
         force = self._solve_ocp(state)
         force = float(np.clip(force, -self.u_max, self.u_max))
