@@ -59,8 +59,9 @@ def parse_args() -> argparse.Namespace:
 
     parser.add_argument(
         '--plots',
-        action='store_true',
-        help='Display the plots alongside the animation',
+        default='',
+        choices=['line', 'phase'],
+        help='Display plots alongside the animation',
     )
 
     parser.add_argument(
@@ -102,7 +103,7 @@ def main():
     result = simulator.run(initial_state=initial_state, duration=args.duration, dt=args.dt)
     print('Done simulating')
 
-    visualize_simulation(result, params, plots=args.plots, trace=args.trace_tip, save_path=args.save_path)
+    visualize_simulation(result, params, plots_type=args.plots, trace=args.trace_tip, save_path=args.save_path)
 
     return 0
 

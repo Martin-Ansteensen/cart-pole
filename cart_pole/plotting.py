@@ -7,7 +7,7 @@ import numpy as np
 from numpy import array, cos, sin, pi, ndarray
 import matplotlib.pyplot as plt
 import matplotlib as mpl
-from matplotlib.animation import FuncAnimation, FFMpegWriter
+from matplotlib.animation import FuncAnimation, FFMpegWriter, PillowWriter
 from matplotlib.patches import Circle, FancyBboxPatch
 import imageio_ffmpeg
 from rich.progress import Progress
@@ -18,16 +18,24 @@ from cart_pole.control import *
 
 
 def visualize_simulation(sim_result: SimulationResult, params: PhysicalParamters,
-                          plots: bool, trace: bool, save_path: Path) -> None:
+                          plots_type: str, trace: bool, save_path: Path) -> None:
     '''Visualize the simulation with relevant plots and an animation'''
     tile_layout = []
-    if plots:
+    if plots_type == "line":
         # Create a tile based layout to have both animation and plots
         tile_layout = [
-            ['anim', 'h1'],
-            ['anim', 'h2'],
-            ['anim', 'h3'],
-            ['h5', 'h4']
+            ['anim', 'x'],
+            ['anim', 'xd'],
+            ['anim', 'theta'],
+            ['u', 'thetad']
+        ]        
+    elif plots_type == "phase":
+        # Create a tile based layout to have both animation and plots
+        tile_layout = [
+            ['anim', 'p1'],
+            ['anim', 'p1'],
+            ['anim', 'p2'],
+            ['u', 'p2']
         ]
     else:
         tile_layout = [['anim']]
@@ -35,8 +43,8 @@ def visualize_simulation(sim_result: SimulationResult, params: PhysicalParamters
     fig, axs = plt.subplot_mosaic(tile_layout, layout='constrained', figsize=(9, 6))
 
     plot_overlays = []
-    if plots:
-        plot_overlays = make_plots(axs, sim_result)
+    if plots_type:
+        plot_overlays = make_plots(axs, sim_result, plots_type)
 
     anim, anim_data = animate_simulation(fig, axs['anim'], sim_result, params, trace, plot_overlays)
 
@@ -149,82 +157,110 @@ def add_series(ax, time: ndarray, values: ndarray, color: str='', label: str='')
     return {'line': overlay_line, 'values': values, 'progress': progress}
 
 
-def make_plots(axs, sim_result: SimulationResult):
+def make_plots(axs, sim_result: SimulationResult, plots_type: str):
     '''Add relevant plots to the figure and prepare animated overlays'''
     overlays = []
     time = sim_result.time_ts
 
-    # Common setup for all axis
-    for ax_name, ax in axs.items():
-        if ax_name == 'anim':
-            continue
-        ax.set_xlabel('Time [s]')
-        ax.axhline(0.0, color='grey', ls='--', alpha=0.3)
+    if plots_type == "line":
 
-    axs['h1'].set_title('Cart position x(t)')
-    axs['h1'].set_ylabel('x(t) [m]')
-    overlay = add_series(axs['h1'], time, sim_result.x_ts)
-    overlays.append(overlay)
+        axs['x'].set_title(r'Cart position $x(t)$')
+        axs['x'].set_ylabel(r'$x(t)$ [m]')
+        axs['x'].set_xlabel('Time [s]')
+        axs['x'].axhline(0.0, color='grey', ls='--', alpha=0.3)
+        overlay = add_series(axs['x'], time, sim_result.x_ts)
+        overlays.append(overlay)
 
-    axs['h2'].set_title('Cart velocity x\'(t)')
-    axs['h2'].set_ylabel('x\'(t) [m]/s')
-    overlay = add_series(axs['h2'], time, sim_result.x_dot_ts)
-    overlays.append(overlay)
+        axs['xd'].set_title(r'Cart velocity $\dot{x}(t)$')
+        axs['xd'].set_ylabel(r'$\dot{x}(t)$ [m]/s')
+        axs['xd'].set_xlabel('Time [s]')
+        axs['xd'].axhline(0.0, color='grey', ls='--', alpha=0.3)
+        overlay = add_series(axs['xd'], time, sim_result.x_dot_ts)
+        overlays.append(overlay)
 
-    axs['h3'].set_title('Pole angle theta(t)')
-    axs['h3'].set_ylabel('theta(t) [rad]')
-    overlay = add_series(axs['h3'], time, sim_result.theta_ts)
-    overlays.append(overlay)
+        axs['theta'].set_title(r'Pole angle $\theta(t)$')
+        axs['theta'].set_ylabel(r'$\theta(t)$ [rad]')
+        axs['theta'].set_xlabel('Time [s]')
+        axs['theta'].axhline(0.0, color='grey', ls='--', alpha=0.3)
+        overlay = add_series(axs['theta'], time, np.unwrap(sim_result.theta_ts))
+        overlays.append(overlay)
 
-    axs['h4'].set_title('Pole angular velocity theta\'(t)')
-    axs['h4'].set_ylabel('theta(t) [rad/s]')
-    overlay = add_series(axs['h4'], time, sim_result.theta_dot_ts)
-    overlays.append(overlay)
+        axs['thetad'].set_title(r'Pole angular velocity $\dot\theta(t)$')
+        axs['thetad'].set_ylabel(r'$\dot\theta(t)$ [rad/s]')
+        axs['thetad'].set_xlabel('Time [s]')
+        axs['thetad'].axhline(0.0, color='grey', ls='--', alpha=0.3)
+        overlay = add_series(axs['thetad'], time, sim_result.theta_dot_ts)
+        overlays.append(overlay)
+
+    elif plots_type == "phase":
+
+        # change theta wrapping point to pendulum upright (the timeseries wraps at pendulum downright)
+        theta_wrapped = (np.unwrap(sim_result.theta_ts)) % (2 * np.pi)
+
+        axs['p1'].set_title(r'$\theta(t), x(t)$ phase portrait')
+        axs['p1'].set_xlabel(r'$x(t)$ [m]')
+        axs['p1'].set_ylabel(r'$\theta(t)$ [rad]')
+        overlay = add_series(axs['p1'], sim_result.x_ts, theta_wrapped)
+        overlays.append(overlay)
+
+        axs['p2'].set_title(r'$\theta(t), \dot\theta(t)$ phase portrait')
+        axs['p2'].set_xlabel(r'$\dot\theta(t)$ [rad/s]')
+        axs['p2'].set_ylabel(r'$\theta(t)$ [rad]')
+        overlay = add_series(axs['p2'], sim_result.theta_dot_ts, theta_wrapped)
+        overlays.append(overlay)
 
     if sim_result.controller == type(None).__name__:
         # We don't have a controller, so we plot the change in energy
         # over time, which should be zero (conservative system)
-        axs['h5'].set_title('Energy difference from t0')
-        axs['h5'].set_ylabel('E0 - E(t) [J]')
-        overlay = add_series(axs['h5'], time, sim_result.energy_ts[0] - sim_result.energy_ts)
+        axs['u'].set_title(r'Energy difference from $t_0$')
+        axs['u'].set_ylabel(r'$E_0 - E(t)$ [J]')
+        overlay = add_series(axs['u'], time, sim_result.energy_ts[0] - sim_result.energy_ts)
         overlays.append(overlay)
 
     else:
         # We have a controller
-        axs['h5'].set_title(f'Control action u using {sim_result.controller}')
-        axs['h5'].set_ylabel('u')
+        axs['u'].set_title(f'Control action u using {sim_result.controller}')
+        axs['u'].set_ylabel('u')
+        axs['u'].set_xlabel('Time [s]')
+        axs['u'].axhline(0.0, color='grey', ls='--', alpha=0.3)
         u_ts = sim_result.u_ts
 
-        # if we are using the Hybrid controller we want to show which
-        # controller is being used at each timepoint
-        if sim_result.controller == HybdridController.__name__:
-            u_type = sim_result.cntrler_type    # np.nan will result in no line
-            lqr_type = Controller.get_idx_of_controller(LQRController.__name__)
-            energy_type = Controller.get_idx_of_controller(EnergyBasedController.__name__)
-            overlay = add_series(axs['h5'], time, np.where(u_type == lqr_type, u_ts, np.nan), color='r', label='LQR')
+        # some controllers switch what they use, show this using different colors
+        u_type = sim_result.cntrler_type    # np.nan will result in no line
+        colors = ["red", "blue", "green", "orange"]
+        for (cntroller_name, cntroller_idx) in Controller.controllers_map.items():
+            u_ts_where_controller_used = np.where(u_type == cntroller_idx, u_ts, np.nan)
+            if np.isnan(u_ts_where_controller_used).all():
+                # don't show e.g. HybridController as a legend; it shows up in controllers_map, but the controllers
+                # it uses are LQR and Energy
+                continue
+            overlay = add_series(axs['u'], time, u_ts_where_controller_used, color=colors.pop(0), label=cntroller_name.partition("Controller")[0])
             overlays.append(overlay)
-            overlay = add_series(axs['h5'], time, np.where(u_type == energy_type, u_ts, np.nan), color='g', label='Energy')
-            overlays.append(overlay)
-            axs['h5'].legend(loc='upper right', fontsize=5)
-
-        else:
-            overlay = add_series(axs['h5'], time, u_ts)
-            overlays.append(overlay)
+            axs['u'].legend(loc='upper right', fontsize=10)
 
     return overlays
 
 
-def save_figure(anim, anim_data, save_path):
+def save_figure(anim, anim_data, save_path: Path):
     '''Save the plt figure as a mp4'''
     mpl.rcParams['animation.ffmpeg_path'] = imageio_ffmpeg.get_ffmpeg_exe()
 
     fps = int(anim_data['fps'])
     n_frames = anim_data['n_frames']
-    writer = FFMpegWriter(fps=fps, codec='h264', bitrate=1800)
     with Progress() as progress:
         task = progress.add_task('Saving animation', total=n_frames)
         def cb(curr_frame: int, total_frames: int):
             '''Callback function to update progress bar for video saving'''
             progress.update(task, completed=curr_frame)
-
-        anim.save(f'{save_path}_{fps}fps.mp4', writer=writer, dpi=150, progress_callback=cb)
+        if save_path.suffix == '.mp4':
+            writer = FFMpegWriter(fps=fps, codec='h264', bitrate=1800)
+            anim.save(f'{save_path.with_suffix("")}_{fps}fps.mp4', writer=writer, dpi=150, progress_callback=cb)
+        else:
+            # default gif
+            writer = PillowWriter(fps=fps)
+            anim.save(
+                f'{save_path.with_suffix("")}_{fps}fps.gif',
+                writer=writer,
+                dpi=150,
+                progress_callback=cb,
+            )
