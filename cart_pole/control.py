@@ -154,8 +154,7 @@ class ModelPredictiveController(Controller):
         self.num_u = self.nu * self.N
         self.nz = self.num_x + self.num_u
         self.num_constraints = self.nx * (self.N + 1)
-        self._build_nlp()
-
+        
         # Will be updated as we do iterations
         self.x_guess = np.zeros((self.N + 1, self.nx), dtype=float)
         self.u_guess = np.zeros((self.nu, self.N), dtype=float)
@@ -163,8 +162,10 @@ class ModelPredictiveController(Controller):
         self.dual_constraints_guess = np.zeros(self.num_constraints, dtype=float)
         self.has_solution = False
         self.previous_u = 0.0
+        
+        self._build_nlp()
 
-
+        
     def _rk4_symbolic(self, state: ca.MX, control: ca.MX) -> ca.MX:
         dt = self.dt
         k1 = self.casadi_dynamics(state, control, 0.0)
@@ -191,10 +192,13 @@ class ModelPredictiveController(Controller):
 
         X = ca.MX.sym('X', self.nx, self.N + 1)                 # state at each sample in horizon
         U = ca.MX.sym('U', self.nu, self.N)                     # input at each sample in horizon
-        P = ca.MX.sym('P', self.nx)                             # parameter vector, stuff we can change between solves without rebuilding NLP
+        P = ca.MX.sym('P', self.nx + self.nu)                   # parameter vector, stuff we can change between solves without rebuilding NLP
+
+        x0 = P[:self.nx]
+        u_prev = P[self.nx:self.nx + self.nu]
 
         objective = 0
-        constraints = [X[:, 0] - P[:self.nx]]                   # provide z0 through the parameter vector
+        constraints = [X[:, 0] - x0]                   # provide z0 through the parameter vector
 
         # numeric constants which are inserted into the symbolic problem, therefore use DM not MX
         q = ca.DM(self.Q)
@@ -207,7 +211,7 @@ class ModelPredictiveController(Controller):
             
             # penalize changes in input (smoothen input)
             if k == 0:
-                delta_u = u_k - 0
+                delta_u = u_k - u_prev
             else:
                 delta_u = u_k - U[:, k - 1]
             objective += self.q_du * delta_u * delta_u
@@ -280,8 +284,9 @@ class ModelPredictiveController(Controller):
         constraint_lower_bounds = np.zeros(self.num_constraints, dtype=float)
         constraint_upper_bounds = np.zeros(self.num_constraints, dtype=float)
 
-        nlp_parameters = np.concatenate([
+        nlp_parameters = np.hstack([
             state,
+            self.previous_u,
         ])
         solution = self.nlp_solver(
             x0=decision_variable_guess,
