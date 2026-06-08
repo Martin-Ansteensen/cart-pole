@@ -18,7 +18,7 @@ from cart_pole.control import *
 
 
 def visualize_simulation(sim_result: SimulationResult, params: PhysicalParamters,
-                          plots_type: str, trace: bool, save_path: Path) -> None:
+                          plots_type: str, trace: bool, save_path: Path, show: bool) -> None:
     '''Visualize the simulation with relevant plots and an animation'''
     tile_layout = []
     if plots_type == "line":
@@ -50,8 +50,8 @@ def visualize_simulation(sim_result: SimulationResult, params: PhysicalParamters
 
     if save_path:
         save_figure(anim, anim_data, save_path)
-
-    plt.show()
+    if show:
+        plt.show()
 
 def animate_simulation(fig, ax, sim_result: SimulationResult,
                        params: PhysicalParamters, trace: bool, plot_overlays=None) -> FuncAnimation:
@@ -212,6 +212,7 @@ def make_plots(axs, sim_result: SimulationResult, plots_type: str):
     if sim_result.controller == type(None).__name__:
         # We don't have a controller, so we plot the change in energy
         # over time, which should be zero (conservative system)
+        axs['u'].set_xlabel('Time [s]')
         axs['u'].set_title(r'Energy difference from $t_0$')
         axs['u'].set_ylabel(r'$E_0 - E(t)$ [J]')
         overlay = add_series(axs['u'], time, sim_result.energy_ts[0] - sim_result.energy_ts)

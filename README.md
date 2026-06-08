@@ -11,14 +11,15 @@ The primary focus of the repo is to prototype and compare controllers that balan
   - Linear quadratic regulator (LQR)
   - Energy-based controlling
   - Hybrid controlling
+  - Model predictive control (MPC)
 
 <table width="100%">
   <tr>
-    <th width="50%">System overview</th>
-    <th width="50%">Passive dynamics - starting with a pole angle of 0.01 rad</th>
+    <th width="40%">System overview</th>
+    <th width="60%">Passive dynamics - starting with a pole angle of 0.01 rad</th>
   </tr>
   <tr>
-    <td><img src="media/state_reference.png" width="80%"/></td>
+    <td><img src="media/cartpole-cart-single.svg" width="100%"/></td>
     <td><img src="media/upright_perturb_50fps.gif" width="100%"/></td>
   </tr>
 </table>
@@ -66,16 +67,16 @@ Initial state `[−2.0, 1.0, 0.5, 0.6]` for $[x, \dot{x}, \theta, \dot{\theta}]$
     <th width="50%">LQR</th>
   </tr>
   <tr>
-    <td><img src="media/upright_none_100fps.gif" width="100%"/></td>
-    <td><img src="media/upright_lqr_100fps.gif" width="100%"/></td>
+    <td><img src="media/upright_none_50fps.gif" width="100%"/></td>
+    <td><img src="media/upright_lqr_50fps.gif" width="100%"/></td>
   </tr>
   <tr>
     <th>Energy-based</th>
     <th>Hybrid</th>
   </tr>
   <tr>
-    <td><img src="media/upright_energy_100fps.gif" width="100%"/></td>
-    <td><img src="media/upright_hybrid_100fps.gif" width="100%"/></td>
+    <td><img src="media/upright_energy_50fps.gif" width="100%"/></td>
+    <td><img src="media/upright_hybrid_50fps.gif" width="100%"/></td>
   </tr>
 </table>
 
@@ -92,16 +93,16 @@ Initial state `[0.1, −0.3, 2.8, −0.5]` for $[x, \dot{x}, \theta, \dot{\theta
     <th width="50%">LQR (fails far from equilibrium)</th>
   </tr>
   <tr>
-    <td><img src="media/downright_none_100fps.gif" width="100%"/></td>
-    <td><img src="media/downright_lqr_100fps.gif" width="100%"/></td>
+    <td><img src="media/downright_none_50fps.gif" width="100%"/></td>
+    <td><img src="media/downright_lqr_50fps.gif" width="100%"/></td>
   </tr>
   <tr>
     <th>Energy-based</th>
     <th>Hybrid</th>
   </tr>
   <tr>
-    <td><img src="media/downright_energy_100fps.gif" width="100%"/></td>
-    <td><img src="media/downright_hybrid_100fps.gif" width="100%"/></td>
+    <td><img src="media/downright_energy_50fps.gif" width="100%"/></td>
+    <td><img src="media/downright_hybrid_50fps.gif" width="100%"/></td>
   </tr>
 </table>
 
@@ -117,6 +118,14 @@ As can be seen from these two cases, the LQR and energy controllers are suited t
   </tr>
 </table>
 <img src="media/hybrid_plots_50fps.gif" width="100%"/></td>
+
+### MPC <a name="mpc"></a>
+MPC uses the dynamical model of the system to create an optimization problem, and at each time step solve for the optimal action to bring the system to the desired state. In this case, as our dynamics are nonlinear we have to solve an NLP when using the dynamics directly (e.g. without linearizing). As MPC is computationally expensive, it is reasonable to use another controller, often LQR, in some domain where it performs well. The added cost of MPC relative to other controllers, like LQR and energy based controlling, comes with many benefits, among them introducing arbitrary constraints on state, input, rate of change in input, etc.
+
+<div align="center">
+  <img src="media/nmpc_plots_50fps.gif" width="100%"/>
+</div>
+
 
 
 ## Installation
@@ -157,32 +166,7 @@ As can be seen from these two cases, the LQR and energy controllers are suited t
 
 ## Exporting Demonstration Videos
 - Supply a path (with filename, but no extension) with `--save-path`
-- Recreate the showcase animations:
-  ```bash
-  # Near upright initial condition
-  cart-pole-run --controller none --duration 8 --initial-state -2 1 0.5 0.6 --trace-tip --save-path media/upright_none
-  cart-pole-run --controller lqr --duration 8 --initial-state -2 1 0.5 0.6 --trace-tip --save-path media/upright_lqr
-  cart-pole-run --controller energy --duration 8 --initial-state -2 1 0.5 0.6 --trace-tip --save-path media/upright_energy
-  cart-pole-run --controller hybrid --duration 8 --initial-state -2 1 0.5 0.6 --trace-tip --save-path media/upright_hybrid
-
-  # Near downward initial condition
-  cart-pole-run --controller none --duration 8 --initial-state 0.1 -0.3 2.8 -0.5 --trace-tip --save-path media/downright_none
-  cart-pole-run --controller lqr --duration 8 --initial-state 0.1 -0.3 2.8 -0.5 --trace-tip --save-path media/downright_lqr
-  cart-pole-run --controller energy --duration 8 --initial-state 0.1 -0.3 2.8 -0.5 --trace-tip --save-path media/downright_energy
-  cart-pole-run --controller hybrid --duration 8 --initial-state 0.1 -0.3 2.8 -0.5 --trace-tip --save-path media/downright_hybrid
-
-  cart-pole-run --controller lqr --duration 5 --initial-state 3 1 1.1 0 --trace-tip --save-path media/lqr_almost_unstable
-  cart-pole-run --controller hybrid --duration 5 --initial-state 3 1 1.1 0 --trace-tip --save-path media/hybrid_very_stable
-  # Hybrid controller with plots
-  cart-pole-run --controller hybrid --duration 4 --initial-state -3 2 1.8 2 --plots --trace-tip --save-path media/hybrid_plots
-
-  # Tabular Q-learning
-  cart-pole-run --controller q_learning --duration 6 --initial-state 1.2 0.1 0.2 0.1 --plots --trace-tip --save-path media/highlight_q_learning
-
-  # Deep Q-Network
-  cart-pole-run --controller dqn --duration 8 --dt 0.02 --initial-state 3 0 0.8 0 --plots --trace --save-path media/dqn_highlight
-  ```
-
+- Recreate the showcase animations by running this [script](./media/create_videos.sh) (or parts of it)
 ## Testing
 - Various tests to uncover bugs and errors are implemented in `tests/`. Run them with:
   ```bash

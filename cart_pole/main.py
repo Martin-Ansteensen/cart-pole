@@ -77,6 +77,12 @@ def parse_args() -> argparse.Namespace:
     )
 
     parser.add_argument(
+        '--no-show-animation',
+        action='store_true',
+        help='If provided, the animation (potentially saved to file) will not be shown and program returns',
+    )
+
+    parser.add_argument(
         '--list',
         action='store_true',
         help='List available configuration presets and exit',
@@ -103,7 +109,8 @@ def main():
     result = simulator.run(initial_state=initial_state, duration=args.duration, dt=args.dt)
     print('Done simulating')
 
-    visualize_simulation(result, params, plots_type=args.plots, trace=args.trace_tip, save_path=args.save_path)
+    visualize_simulation(result, params, plots_type=args.plots, trace=args.trace_tip,
+                         save_path=args.save_path, show=(not args.no_show_animation))
 
     return 0
 
