@@ -87,7 +87,12 @@ def parse_args() -> argparse.Namespace:
         action='store_true',
         help='List available configuration presets and exit',
     )
-
+    parser.add_argument(
+        '--configuration',
+        default='single',
+        choices=['single', 'double'],
+        help='Choose number of links in the pendulum',
+    )
     return parser.parse_args()
 
 def main():
@@ -97,9 +102,9 @@ def main():
     if args.list:
         return cnfg.print_presets(args.config)
 
-    params = cnfg.build_physical_params(config, args.physical)
+    params = cnfg.build_physical_params(config, args.physical, args.configuration)
     dynamics = CartPoleDynamics(params)
-    controller = cnfg.build_controller(config, args.controller, args.controller_profile, dynamics)
+    controller = cnfg.build_controller(config, args.controller, args.controller_profile, dynamics, args.configuration)
 
     simulator = Simulator(dynamics, controller)
 

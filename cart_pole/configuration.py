@@ -6,7 +6,7 @@ import pickle
 import numpy as np
 
 from cart_pole.control import EnergyBasedController, HybdridController, LQRController, ModelPredictiveController
-from cart_pole.dynamics import CartPoleDynamics, PhysicalParamters
+from cart_pole.dynamics import CartPoleDynamics, PhysicalParamters, SinglePhysicalParamters, DoublePhysicalParamters
 import cart_pole.q_learning as ql
 import cart_pole.dqn as dqn
 
@@ -32,50 +32,59 @@ def load_config(path: Path) -> dict:
 
     return data
 
+def list_pendulum_profiles(config: dict):
+    '''Return all profiles for pendulum configurations'''
+    return sorted(config.keys())
 
-def list_physical_profiles(config):
-    '''Return all profiles for physical paramters'''
-    return sorted(config.get('physical', {}).keys())
+def list_physical_profiles(config: dict, pendulum_profile: str):
+    '''Return all profiles for physical paramters '''
+    return sorted(config[pendulum_profile].get('physical', {}).keys())
 
 
-def list_controller_types(config):
+def list_controller_types(config: dict, pendulum_profile: str):
     '''Return all types of controllers'''
-    return sorted(config.get('controllers', {}).keys())
+    return sorted(config[pendulum_profile].get('controllers', {}).keys())
 
 
-def list_controller_profiles(config, controller):
+def list_controller_profiles(config: dict, controller: str, pendulum_profile: str):
     '''Return all profiles for one type of controller'''
-    controllers = config.get('controllers', {})
+    controllers = config[pendulum_profile].get('controllers', {})
     return sorted(controllers.get(controller, {}).keys())
 
 
 def print_presets(config_path: Path):
     '''Print possible choices listed in the config file'''
     config = load_config(config_path)
-    print('Physical parameter presets:')
-    for name in list_physical_profiles(config):
-        print(f'\t- {name}')
+    print("Pendulum configurations:")
+    for pendulum_profile in list_pendulum_profiles(config):
+        print(f'\n- {pendulum_profile}')
+        print('\tPhysical parameter presets:')
+        for name in list_physical_profiles(config, pendulum_profile):
+            print(f'\t\t- {name}')
 
-    print('\nController presets:')
-    for controller in list_controller_types(config):
-        profiles = list_controller_profiles(config, controller)
-        profiles_format = ', '.join(profiles)
-        print(f'\t- {controller}: {profiles_format}')
+        print('\n\tController presets:')
+        for controller in list_controller_types(config, pendulum_profile):
+            profiles = list_controller_profiles(config, controller, pendulum_profile)
+            profiles_format = ', '.join(profiles)
+            print(f'\t\t- {controller}: {profiles_format}')
 
 
-def build_physical_params(config, profile: str) -> PhysicalParamters:
+def build_physical_params(config: dict, physical_profile: str, pendulum_profile: str) -> PhysicalParamters:
     '''Parse the physical paramteres from the config file into
     the appropiate object'''
-    physical_section = config['physical']
-    selection = physical_section[profile]
-    return PhysicalParamters(**selection)
+    physical_section = config[pendulum_profile]['physical']
+    selection = physical_section[physical_profile]
+    if pendulum_profile == "double":
+        return DoublePhysicalParamters(**selection)
+    else:
+        return SinglePhysicalParamters(**selection)
 
-def build_controller(config, controller_name, controller_profile, dynamics: CartPoleDynamics):
+def build_controller(config: dict, controller_name: str, controller_profile: str, dynamics: CartPoleDynamics, pendulum_profile: str):
     '''Create controller object based on config'''
     if controller_name == 'none':
         return None
 
-    controllers_section = config['controllers']
+    controllers_section = config[pendulum_profile]['controllers']
     profile_data = controllers_section[controller_name][controller_profile]
 
     if controller_name == 'lqr':
@@ -120,7 +129,7 @@ def build_controller(config, controller_name, controller_profile, dynamics: Cart
         lqr_presets = controllers_section['lqr'][lqr_profile]
 
         return ModelPredictiveController(
-            dynamics, np.diag(profile_data["Q"]), profile_data["R"], profile_data["dt"], profile_data["N"],
+            dynamics, profile_data["Q"], profile_data["R"], profile_data["dt"], profile_data["N"],
             np.array(profile_data["z_max"], dtype=float), profile_data["u_max"], profile_data["q_du"],
             profile_data["lqr_state_bounds"], lqr_kwargs={'Q': lqr_presets['Q'], 'R': lqr_presets['R']})
 

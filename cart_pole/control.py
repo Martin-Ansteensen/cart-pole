@@ -44,8 +44,8 @@ class LQRController(Controller):
         '''Calculate optimal gain K based on Q, R and the dynamics of the system.'''
         super().__init__()
         self.dynamics = dynamics
-        self.Q = array(Q, dtype=float)
-        self.R = array(R, dtype=float)
+        self.Q = np.diag(np.array(Q, dtype=float))
+        self.R = np.diag(np.array(R, dtype=float))
 
         # We want to regulate about the upright position with
         # the cart in the center -> state 0 0 0 0
@@ -139,9 +139,9 @@ class ModelPredictiveController(Controller):
         self.u_max = u_max  # bound on input
         self.z_max = z_max  # bound on states
 
-        self.Q = Q          # state cost matrix
+        self.Q = np.diag(Q)          # state cost matrix
         self.q_du = q_du    # cost for changes in u
-        self.R = R          # input cost matrix
+        self.R = np.diag(R)          # input cost matrix
         
         # Terminal cost calculations, use LQR solution about upright equilibrium
         target = np.zeros(4, dtype=float)

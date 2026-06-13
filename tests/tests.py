@@ -12,7 +12,7 @@ import sympy as sp
 from nbformat import read, NO_CONVERT
 from nbclient import NotebookClient
 
-from cart_pole.dynamics import CartPoleDynamics, PhysicalParamters, State
+from cart_pole.dynamics import CartPoleDynamics, SinglePhysicalParamters, State
 from cart_pole.simulation import Simulator, SimulationResult
 from cart_pole.control import *
 
@@ -22,7 +22,7 @@ class TestSymbolicDynamics(unittest.TestCase):
     evaluate to the correct values'''
 
     def setUp(self):
-            self.pkl_path = 'cart_pole/dynamics.pkl'
+            self.pkl_path = 'cart_pole/dynamics_single.pkl'
 
     def test_file_exists(self):
         '''Verify that the pickle file exists before loading.'''
@@ -48,7 +48,7 @@ class TestSimulationStable(unittest.TestCase):
 
     def setUp(self):
         '''Perform tasks that always has to be done before running a test'''
-        self.params = PhysicalParamters()
+        self.params = SinglePhysicalParamters()
         self.dynamics = CartPoleDynamics(self.params)
         self.simulator = Simulator(self.dynamics)
         self.T = 20         # duration
@@ -149,7 +149,7 @@ class TestController():
         raise NotImplemented
 
     def setUp(self):
-        self.params = PhysicalParamters()
+        self.params = SinglePhysicalParamters()
         self.dynamics = CartPoleDynamics(self.params)
         self.controller = self.create_controller()
         self.simulator = Simulator(self.dynamics, self.controller)
@@ -182,7 +182,7 @@ class TestController():
 class TestLQRController(TestController, unittest.TestCase):
     '''Test LQR controller'''
     def create_controller(self):
-        return LQRController(self.dynamics, np.diag([1.0, 1.0, 1.0, 20.0]), array([[0.1]]))
+        return LQRController(self.dynamics, [1.0, 1.0, 1.0, 20.0], [0.1])
 
 
 class TestEnergyController(TestController, unittest.TestCase):
@@ -195,17 +195,17 @@ class TestHybridController(TestController, unittest.TestCase):
     '''Test hybrid controller'''
     def create_controller(self):
         return HybdridController(self.dynamics,
-                                 {'Q': np.diag([1.0, 1.0, 1.0, 20.0]), 'R': array([[0.1]])},
+                                 {'Q': [1.0, 1.0, 1.0, 20.0], 'R': [0.1]},
                                  {'energy_gain': 15, 'position_gain': 2, 'velocity_gain': 2.5, 'umax': 100})
 
 
 class TestModelPredictiveController(TestController, unittest.TestCase):
     def create_controller(self):
         return ModelPredictiveController(
-            dynamics=self.dynamics, Q=np.diag([4.0, 1.0, 10.0, 1.0]), R=0.1, dt=0.02, N=50,
+            dynamics=self.dynamics, Q=[4.0, 1.0, 10.0, 1.0], R=[0.1], dt=0.02, N=50,
             z_max=np.array([4.0, np.inf, np.inf, np.inf]), u_max=40.0, q_du=1.0,
             lqr_state_bounds=[2, 5, 0.4, 5],
-            lqr_kwargs={'Q': np.diag([1.0, 1.0, 1.0, 20.0]), 'R': array([[0.1]])})
+            lqr_kwargs={'Q': [1.0, 1.0, 1.0, 20.0], 'R': [0.1]})
 
 class TestNotebookArtifact(unittest.TestCase):
     '''The notebook produces a .pkl file containing the dynamics of the system,
@@ -220,9 +220,9 @@ class TestNotebookArtifact(unittest.TestCase):
         # path to the unittest file
         path_to_file = pathlib.Path(__file__).resolve().parents[1]
         # path to .pkl file in repo
-        pkl_path = path_to_file / 'cart_pole' / 'dynamics.pkl'
+        pkl_path = path_to_file / 'cart_pole' / 'dynamics_single.pkl'
         # path to notebook
-        nb_path = path_to_file / 'dynamics.ipynb'
+        nb_path = path_to_file / 'dynamics_single.ipynb'
 
         def load_pickle(path):
             with open(path, 'rb') as f:
@@ -235,7 +235,7 @@ class TestNotebookArtifact(unittest.TestCase):
         with tempfile.TemporaryDirectory() as td:
             td = pathlib.Path(td)   # path to temporary directory
             # path to the artifact (pickle file) that will be created by the notebook
-            artifact_path = td / 'cart_pole' / 'dynamics.pkl'
+            artifact_path = td / 'cart_pole' / 'dynamics_single.pkl'
             # since we are working a temporary dir, we need to make the folder
             # cartpole as it does not exist
             artifact_path.parent.mkdir(parents=True, exist_ok=True)
@@ -245,7 +245,7 @@ class TestNotebookArtifact(unittest.TestCase):
             client = NotebookClient(nb, timeout=600, kernel_name="python3", allow_errors=False)
             client.execute(cwd=td)
 
-            self.assertTrue(artifact_path.exists(), "Notebook did not produce dynamics.pkl")
+            self.assertTrue(artifact_path.exists(), "Notebook did not produce dynamics_single.pkl")
 
             self.assertEqual(load_pickle(artifact_path), load_pickle(pkl_path),
                              "Generated .pkl differs from the one in the repo")

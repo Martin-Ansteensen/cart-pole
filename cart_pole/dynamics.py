@@ -2,6 +2,7 @@
 from dataclasses import dataclass, asdict
 import pickle
 from pathlib import Path
+from abc import ABC
 
 from numpy import pi, ndarray
 import sympy as sp
@@ -12,8 +13,12 @@ import casadi as ca
 # (x, x_dot, theta, theta_dot).
 State = ndarray
 
+@dataclass
+class PhysicalParamters(ABC):
+    pass
+
 @dataclass(slots=True)
-class PhysicalParamters:
+class SinglePhysicalParamters(PhysicalParamters):
     '''We have a physical system with a
         * cart
         * weightless pole attached the cart that can pivot
@@ -24,9 +29,26 @@ class PhysicalParamters:
     l: float = 1        # pole length (m)
     m: float = 0.3      # tip mass (kg)
     g: float = 9.81     # gravity (m/s^2)
-    J_r: float = 0        # pole inertia
-    m_r: float = 0      # pole mass
+    J_r: float = 0.08   # pole inertia
+    m_r: float = 0.1    # pole mass
 
+
+@dataclass(slots=True)
+class DoublePhysicalParamters(PhysicalParamters):
+    '''We have a physical system with a
+        * cart
+        * weightless pole attached the cart that can pivot
+        * tip mass attached to the end of the pole
+    The system is not subject to friction
+    '''
+    M: float = 0.5      # cart mass (kg)
+    l: float = 1        # pole length (m)
+    m: float = 0.3      # tip mass (kg)
+    g: float = 9.81     # gravity (m/s^2)
+    J_1: float = 0      # pole 1 inertia
+    m_1: float = 0      # pole 1 mass
+    J_2: float = 0      # pole 1 inertia
+    m_2: float = 0      # pole 1 mass
 
 class CartPoleDynamics:
 
@@ -41,7 +63,7 @@ class CartPoleDynamics:
         '''Load the dynamics in symbolic form. Replace the physical
         constants with their numerical value, and create functions
         to let us set the rest of symbols'''
-        file_path = Path(__file__).parent / 'dynamics.pkl'
+        file_path = Path(__file__).parent / 'dynamics_single.pkl'
         with open(file_path, 'rb') as f:
             data = pickle.load(f)
 
