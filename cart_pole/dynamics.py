@@ -21,9 +21,11 @@ class PhysicalParamters:
     The system is not subject to friction
     '''
     M: float = 0.5      # cart mass (kg)
-    l: float = 1      # pole length (m)
+    l: float = 1        # pole length (m)
     m: float = 0.3      # tip mass (kg)
     g: float = 9.81     # gravity (m/s^2)
+    J_r: float = 0        # pole inertia
+    m_r: float = 0      # pole mass
 
 
 class CartPoleDynamics:
