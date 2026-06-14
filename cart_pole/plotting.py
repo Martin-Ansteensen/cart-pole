@@ -1,5 +1,4 @@
 #!/usr/bin/python3
-from dataclasses import dataclass
 from pathlib import Path
 from collections import deque
 
@@ -27,10 +26,12 @@ DARKRED = COLORS[5]
 LIGHTORANGE = COLORS[6]
 DARKORANGE = COLORS[7]
 POLECOLORS = [LIGHTGREEN, LIGHTORANGE]
+MAX_ANIMATION_FPS = 50.0
 mpl.rcParams["axes.prop_cycle"] = cycler(color=mpl.colormaps["Set1"].colors)
 
 def visualize_simulation(sim_result: SimulationResult, params: PhysicalParamters,
-                          plots_type: str, trace: bool, save_path: Path, show: bool) -> None:
+                          plots_type: str, trace: bool, save_path: Path,
+                          show: bool) -> None:
     '''Visualize the simulation with relevant plots and an animation'''
     tile_layout = []
     if plots_type == "line":
@@ -58,7 +59,14 @@ def visualize_simulation(sim_result: SimulationResult, params: PhysicalParamters
     if plots_type:
         plot_overlays = make_plots(axs, sim_result, params, plots_type)
 
-    anim, anim_data = animate_simulation(fig, axs['anim'], sim_result, params, trace, plot_overlays)
+    anim, anim_data = animate_simulation(
+        fig,
+        axs['anim'],
+        sim_result,
+        params,
+        trace,
+        plot_overlays,
+    )
 
     if save_path:
         save_figure(anim, anim_data, save_path)
@@ -102,8 +110,26 @@ def animate_simulation(fig, ax, sim_result: SimulationResult,
     ax.add_patch(cart_patch)
     ax.add_patch(pole_circle)
 
+    fps = min(MAX_ANIMATION_FPS, 1.0 / sim_result.dt)
+    animation_dt = 1.0 / fps
+    target_times = np.arange(
+        sim_result.time_ts[0],
+        sim_result.time_ts[-1],
+        animation_dt,
+    )
+    if len(target_times) == 0:
+        target_times = np.array([sim_result.time_ts[0]])
+    frame_indices = np.searchsorted(sim_result.time_ts, target_times, side='left')
+    frame_indices = np.clip(frame_indices, 0, len(sim_result.time_ts) - 1)
+    previous_indices = np.maximum(frame_indices - 1, 0)
+    use_previous = (
+        np.abs(sim_result.time_ts[previous_indices] - target_times)
+        < np.abs(sim_result.time_ts[frame_indices] - target_times)
+    )
+    frame_indices = np.where(use_previous, previous_indices, frame_indices)
+
     # trace the pole tip for T s, contains tuples (x, y)
-    T = 2; n = int(T / sim_result.dt)
+    T = 2; n = int(T * fps)
     tip_trace = deque(maxlen=n)
     tip_trace_line, = ax.plot([], [], lw=2, ls='--', color=LIGHTRED)
 
@@ -149,20 +175,18 @@ def animate_simulation(fig, ax, sim_result: SimulationResult,
         if trace:
             tip_trace_line.set_data(zip(*tip_trace))
 
-        # Fill the progress with one more datapoint each frame
         for entry in plot_overlays:
             progress = entry['progress']
-            progress[frame] = entry['values'][frame]
+            progress[:frame + 1] = entry['values'][:frame + 1]
+            progress[frame + 1:] = np.nan
             entry['line'].set_ydata(progress)
 
         artists = [cart_patch, *pole_lines, pole_circle, time_text, tip_trace_line]
         artists.extend(overlay_lines)
         return artists
 
-    # FPS to play back simulation in real time
-    fps = 1 / sim_result.dt
-    n_frames = len(sim_result.time_ts)
-    anim = FuncAnimation(fig, update, frames=n_frames,
+    n_frames = len(frame_indices)
+    anim = FuncAnimation(fig, update, frames=frame_indices,
                          interval=1000.0 / fps, blit=True,
                          init_func=init_animation)
 
@@ -280,7 +304,8 @@ def save_figure(anim, anim_data, save_path: Path):
     '''Save the plt figure as a mp4'''
     mpl.rcParams['animation.ffmpeg_path'] = imageio_ffmpeg.get_ffmpeg_exe()
 
-    fps = int(anim_data['fps'])
+    fps = anim_data['fps']
+    fps_label = f'{fps:g}'
     n_frames = anim_data['n_frames']
     with Progress() as progress:
         task = progress.add_task('Saving animation', total=n_frames)
@@ -289,12 +314,12 @@ def save_figure(anim, anim_data, save_path: Path):
             progress.update(task, completed=curr_frame)
         if save_path.suffix == '.mp4':
             writer = FFMpegWriter(fps=fps, codec='h264', bitrate=1800)
-            anim.save(f'{save_path.with_suffix("")}_{fps}fps.mp4', writer=writer, dpi=150, progress_callback=cb)
+            anim.save(f'{save_path.with_suffix("")}_{fps_label}fps.mp4', writer=writer, dpi=150, progress_callback=cb)
         else:
             # default gif
             writer = PillowWriter(fps=fps)
             anim.save(
-                f'{save_path.with_suffix("")}_{fps}fps.gif',
+                f'{save_path.with_suffix("")}_{fps_label}fps.gif',
                 writer=writer,
                 dpi=150,
                 progress_callback=cb,

@@ -129,7 +129,7 @@ MPC uses the dynamical model of the system to create an optimization problem, an
 
 ## Double pendulum (WIP)
 <div align="center">
-  <img src="media/double_pendulum_200fps.gif" width="100%"/>
+  <img src="media/double_pendulum_50fps.gif" width="100%"/>
 </div>
 
 ## Installation
