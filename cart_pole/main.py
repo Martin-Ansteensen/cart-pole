@@ -5,7 +5,7 @@ from pathlib import Path
 import numpy as np
 
 import cart_pole.configuration as cnfg
-from cart_pole.dynamics import CartPoleDynamics
+from cart_pole.dynamics import CartPoleDynamics, PHYSICAL_CONFIGS
 from cart_pole.plotting import visualize_simulation
 from cart_pole.simulation import Simulator
 
@@ -51,7 +51,7 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         '--initial-state',
-        nargs=4,
+        nargs="+",
         type=float,
         default=[1, -1, 0.3, 0],
         help='Initial state of the system',
@@ -88,9 +88,9 @@ def parse_args() -> argparse.Namespace:
         help='List available configuration presets and exit',
     )
     parser.add_argument(
-        '--configuration',
+        '--system',
         default='single',
-        choices=['single', 'double'],
+        choices=list(PHYSICAL_CONFIGS.keys()),
         help='Choose number of links in the pendulum',
     )
     return parser.parse_args()
@@ -102,9 +102,9 @@ def main():
     if args.list:
         return cnfg.print_presets(args.config)
 
-    params = cnfg.build_physical_params(config, args.physical, args.configuration)
-    dynamics = CartPoleDynamics(params)
-    controller = cnfg.build_controller(config, args.controller, args.controller_profile, dynamics, args.configuration)
+    params = cnfg.build_physical_params(config, args.physical, args.system)
+    dynamics = CartPoleDynamics(params, args.system)
+    controller = cnfg.build_controller(config, args.controller, args.controller_profile, dynamics, args.system)
 
     simulator = Simulator(dynamics, controller)
 

@@ -88,7 +88,7 @@ class EnergyBasedController(Controller):
         Returns the control force and the controllers name index.'''
         x, x_dot, theta, theta_dot = self.wrap_theta(state)
         m = self.dynamics.m
-        l = self.dynamics.l
+        l = self.dynamics.l_1
         g = self.dynamics.g
 
         # Calculate kinetic and potential energy in the pole

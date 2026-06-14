@@ -2,7 +2,7 @@
 from dataclasses import dataclass, asdict
 import pickle
 from pathlib import Path
-from abc import ABC
+from abc import ABC, abstractmethod
 
 from numpy import pi, ndarray
 import sympy as sp
@@ -17,6 +17,16 @@ State = ndarray
 class PhysicalParamters(ABC):
     pass
 
+    @property
+    @abstractmethod
+    def pole_lengths(self) -> int:
+        pass
+
+    @property
+    def n_poles(self) -> int:
+        return len(self.pole_lengths)
+
+
 @dataclass(slots=True)
 class SinglePhysicalParamters(PhysicalParamters):
     '''We have a physical system with a
@@ -26,12 +36,15 @@ class SinglePhysicalParamters(PhysicalParamters):
     The system is not subject to friction
     '''
     M: float = 0.5      # cart mass (kg)
-    l: float = 1        # pole length (m)
+    l_1: float = 1      # pole length (m)
     m: float = 0.3      # tip mass (kg)
     g: float = 9.81     # gravity (m/s^2)
-    J_r: float = 0.08   # pole inertia
-    m_r: float = 0.1    # pole mass
+    J_1: float = 0.08   # pole inertia
+    m_1: float = 0.1    # pole mass
 
+    @property
+    def pole_lengths(self) -> int:
+        return [self.l_1]
 
 @dataclass(slots=True)
 class DoublePhysicalParamters(PhysicalParamters):
@@ -42,28 +55,47 @@ class DoublePhysicalParamters(PhysicalParamters):
     The system is not subject to friction
     '''
     M: float = 0.5      # cart mass (kg)
-    l: float = 1        # pole length (m)
     m: float = 0.3      # tip mass (kg)
     g: float = 9.81     # gravity (m/s^2)
-    J_1: float = 0      # pole 1 inertia
-    m_1: float = 0      # pole 1 mass
-    J_2: float = 0      # pole 1 inertia
-    m_2: float = 0      # pole 1 mass
+    l_1: float = 1      # pole 1 length (m)
+    J_1: float = 0.08      # pole 1 inertia
+    m_1: float = 0.1      # pole 1 mass
+    l_2: float = 1      # pole 2 length (m)
+    J_2: float = 0.08      # pole 2 inertia
+    m_2: float = 0.1      # pole 2 mass
+
+    @property
+    def pole_lengths(self) -> int:
+        return [self.l_1, self.l_2]
+
+PHYSICAL_CONFIGS = {
+    'single': {
+        "params": SinglePhysicalParamters,
+        "pkl_name": 'dynamics_single.pkl',
+        "nb_name": "dynamics_single.ipynb"
+    },
+    'double': {
+        'params': DoublePhysicalParamters,
+        'pkl_name': 'dynamics_double.pkl',
+        "nb_name": "dynamics_double.ipynb"
+    }
+}
 
 class CartPoleDynamics:
 
-    def __init__(self, params: PhysicalParamters):
+    def __init__(self, params: PhysicalParamters, system: str='single'):
         # Unpack all variables in params into local variables
         # params.x = v -> self.x = v
         for attr, val in asdict(params).items():
             setattr(self, attr, val)
+        self.system = system
         self.load_dynamics(params)
 
     def load_dynamics(self, params):
         '''Load the dynamics in symbolic form. Replace the physical
         constants with their numerical value, and create functions
         to let us set the rest of symbols'''
-        file_path = Path(__file__).parent / 'dynamics_single.pkl'
+        file_path = Path(__file__).parent / PHYSICAL_CONFIGS[self.system]['pkl_name']
         with open(file_path, 'rb') as f:
             data = pickle.load(f)
 
@@ -96,13 +128,15 @@ class CartPoleDynamics:
         self.w_symbol = w
         self.f_sympy = f
 
-        # Create a function from the sympy expression
-        self._f_func = sp.lambdify((*z, u, w), f, 'numpy')
-        self._df_dz_func = sp.lambdify((*z, u, w), df_dz, 'numpy')
-        self._df_du_func = sp.lambdify((*z, u, w), df_du, 'numpy')
-        self._Ek_func = sp.lambdify(z, Ek, 'numpy')
-        self._Ep_func = sp.lambdify(z, Ep, 'numpy')
+        self.nz = len(self.z_symbols)
+        self.nu = 1
 
+        # Create a function from the sympy expression
+        self._f_func = sp.lambdify((*z, u, w), f, 'numpy', cse=True)
+        self._df_dz_func = sp.lambdify((*z, u, w), df_dz, 'numpy', cse=True)
+        self._df_du_func = sp.lambdify((*z, u, w), df_du, 'numpy', cse=True)
+        self._Ek_func = sp.lambdify(z, Ek, 'numpy', cse=True)
+        self._Ep_func = sp.lambdify(z, Ep, 'numpy', cse=True)
 
     def nonlinear_derivatives(self, state: State, u: float, w: float) -> State:
         '''Return the time-derivative of the state using the the non-linear
@@ -118,17 +152,13 @@ class CartPoleDynamics:
 
     def nonlinear_state_jacobian(self, state: State, u: float, w: float) -> ndarray:
         '''Calculate the jacobian of the non-linear system dynamics
-        wrt. the state.
-        
-        Returns: 4x4 array
+        wrt. the state.        
         '''
         return self._df_dz_func(*state, u, w)
 
     def nonlinear_control_jacobian(self, state: State, u: float, w: float) -> ndarray:
         '''Calculate the jacobian of the non-linear system dynamics
-        wrt. the control action.
-        
-        Returns: 4x1 array
+        wrt. the control action.        
         '''
         return self._df_du_func(*state, u, w)
 
@@ -138,26 +168,20 @@ class CartPoleDynamics:
         return casadi_expr
 
     def casadi_dynamics(self, jit: bool = True) -> ca.Function:
-        z = ca.MX.sym('z', 4)
+        z = ca.MX.sym('z', self.nz)
         u = ca.MX.sym('u')
         w = ca.MX.sym('w')
         sympy_symbols = [self.z_symbols[i] for i in range(4)]
         sympy_symbols += [self.u_symbol, self.w_symbol]
 
         f_casadi = self.sympy_to_casadi(self.f_sympy, sympy_symbols)
-        casadi_vars = [
-        z[0],
-        z[1],
-        z[2],
-        z[3],
-        u,
-        w,
-        ]
+        casadi_vars = [z[i] for i in range(self.nz)]
+        casadi_vars.extend([u, w])
         x_dot = f_casadi(*casadi_vars)
         self._f_casadi_func = ca.Function(
             'cartpole_f',       # function name
             [z, u, w],          # input variables
-            [x_dot],         # output variables
+            [x_dot],            # output variables
             ['z', 'u', 'w'],    # input names
             ['z_dot'],          # output names
             {'jit': jit}            

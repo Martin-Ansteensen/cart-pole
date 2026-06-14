@@ -127,6 +127,10 @@ MPC uses the dynamical model of the system to create an optimization problem, an
 </div>
 
 
+## Double pendulum (WIP)
+<div align="center">
+  <img src="media/double_pendulum_200fps.gif" width="100%"/>
+</div>
 
 ## Installation
 - Install Python 3.8+ 

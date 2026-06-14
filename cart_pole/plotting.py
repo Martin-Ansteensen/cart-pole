@@ -7,6 +7,7 @@ import numpy as np
 from numpy import array, cos, sin, pi, ndarray
 import matplotlib.pyplot as plt
 import matplotlib as mpl
+from cycler import cycler
 from matplotlib.animation import FuncAnimation, FFMpegWriter, PillowWriter
 from matplotlib.patches import Circle, FancyBboxPatch
 import imageio_ffmpeg
@@ -16,6 +17,17 @@ from cart_pole.simulation import SimulationResult
 from cart_pole.dynamics import PhysicalParamters
 from cart_pole.control import *
 
+COLORS = mpl.cm.Paired.colors
+LIGHTBLUE = COLORS[0]
+DARKBLUE = COLORS[1]
+LIGHTGREEN = COLORS[2]
+DARKGREEN = COLORS[3]
+LIGHTRED = COLORS[4]
+DARKRED = COLORS[5]
+LIGHTORANGE = COLORS[6]
+DARKORANGE = COLORS[7]
+POLECOLORS = [LIGHTGREEN, LIGHTORANGE]
+mpl.rcParams["axes.prop_cycle"] = cycler(color=mpl.colormaps["Set1"].colors)
 
 def visualize_simulation(sim_result: SimulationResult, params: PhysicalParamters,
                           plots_type: str, trace: bool, save_path: Path, show: bool) -> None:
@@ -44,7 +56,7 @@ def visualize_simulation(sim_result: SimulationResult, params: PhysicalParamters
 
     plot_overlays = []
     if plots_type:
-        plot_overlays = make_plots(axs, sim_result, plots_type)
+        plot_overlays = make_plots(axs, sim_result, params, plots_type)
 
     anim, anim_data = animate_simulation(fig, axs['anim'], sim_result, params, trace, plot_overlays)
 
@@ -56,17 +68,17 @@ def visualize_simulation(sim_result: SimulationResult, params: PhysicalParamters
 def animate_simulation(fig, ax, sim_result: SimulationResult,
                        params: PhysicalParamters, trace: bool, plot_overlays=None) -> FuncAnimation:
     '''Animate a precomputed SimulationResult'''
-    colors = mpl.cm.Paired.colors
 
     cart_width = 0.8
     cart_height = 0.4
     # Scale pole circle radius so that area is related to weight
     pole_circle_radius = np.sqrt(cart_width * cart_height / pi * params.m / params.M)
 
-    aspect_ratio = 9.0 / 16.0                                                           # height / width
-    y_lim = 2*array([-params.l * 0.4 - cart_height, params.l * 1.1 + cart_height])      # chosen arbitrarily
-    x_lim = array([-0.5, 0.5])                                                          # symmetric x-axis
-    x_lim *= (y_lim[1] - y_lim[0]) * 1 / aspect_ratio                                   # scale to perserve aspect ratio
+    aspect_ratio = 9.0 / 16.0
+    l = sum(params.pole_lengths)
+    y_lim = 2*array([-l * 0.4 - cart_height, l * 1.1 + cart_height])        # chosen arbitrarily
+    x_lim = array([-0.5, 0.5])                                              # symmetric x-axis
+    x_lim *= (y_lim[1] - y_lim[0]) * 1 / aspect_ratio                       # scale to perserve aspect ratio
 
     ax.set_box_aspect(aspect_ratio)
     ax.set_xlim(*x_lim)
@@ -78,9 +90,14 @@ def animate_simulation(fig, ax, sim_result: SimulationResult,
     # Origin of patch is in bottom left corner, so we need to offset it
     cart_offset = np.array([-cart_width / 2.0, 0.0])
     cart_patch = FancyBboxPatch((0, 0), cart_width, cart_height,
-                                boxstyle='round, pad=0.05', fc=colors[0], ec=colors[1], lw=2)
-    pole_line, = ax.plot([], [], lw=6, color=colors[2], zorder=-1)
-    pole_circle = Circle((0, 0), radius=pole_circle_radius, fc=colors[4], ec=colors[5], lw=2)
+                                boxstyle='round, pad=0.05', fc=LIGHTBLUE, ec=DARKBLUE, lw=2)
+   
+    pole_lines = []
+    for i in range(params.n_poles):
+        pole_line, = ax.plot([], [], lw=6, color=POLECOLORS[int(i%2)], zorder=-1)
+        pole_lines.append(pole_line)
+
+    pole_circle = Circle((0, 0), radius=pole_circle_radius, fc=LIGHTRED, ec=DARKRED, lw=2)
 
     ax.add_patch(cart_patch)
     ax.add_patch(pole_circle)
@@ -88,7 +105,7 @@ def animate_simulation(fig, ax, sim_result: SimulationResult,
     # trace the pole tip for T s, contains tuples (x, y)
     T = 2; n = int(T / sim_result.dt)
     tip_trace = deque(maxlen=n)
-    tip_trace_line, = ax.plot([], [], lw=2, ls='--', color=colors[4])
+    tip_trace_line, = ax.plot([], [], lw=2, ls='--', color=LIGHTRED)
 
     # Display time at the top of the axis
     time_text = ax.text(0.02, 0.95, '', transform=ax.transAxes)
@@ -102,7 +119,7 @@ def animate_simulation(fig, ax, sim_result: SimulationResult,
         for entry in plot_overlays:
             entry['progress'].fill(np.nan)
             entry['line'].set_ydata(entry['progress'])
-        artists = [cart_patch, pole_line, pole_circle, time_text, tip_trace_line]
+        artists = [cart_patch, *pole_lines, pole_circle, time_text, tip_trace_line]
         artists.extend(overlay_lines)
         return tuple(artists)
 
@@ -110,14 +127,23 @@ def animate_simulation(fig, ax, sim_result: SimulationResult,
         '''Update function for animation called each frame'''
         state = sim_result.state_ts[frame]
         x = state[0]
-        theta = state[2]
-
-        cart_patch.set_x(x + cart_offset[0])                                    # Place center of cart at the x pos
-        pivot = np.array([x, cart_height])                                      # Pivot of pole
-        pole_circle.center = pivot + params.l*array([-sin(theta), cos(theta)])  # Center of pole circle
-        pole_line.set_data(zip(pivot, pole_circle.center))                      # set x-data and y-data
-        time_text.set_text(f't = {sim_result.time_ts[frame]:.2f} s')            # update time
         
+        cart_patch.set_x(x + cart_offset[0])        # Place center of cart at the x pos
+        pivot_start = np.array([x, cart_height])    # Pivot of first pole        
+
+        theta_cumsum = 0
+        for i in range(len(pole_lines)):
+            theta_i = state[2*(i+1)]
+            theta_cumsum += theta_i
+            l_i = params.pole_lengths[i]
+            pivot_end = pivot_start + l_i*array([-sin(theta_cumsum), cos(theta_cumsum)])    # end of of pole i, start of next pole
+            pole_lines[i].set_data(zip(pivot_start, pivot_end))                             # set start and end point
+            pivot_start = pivot_end                                                         # start the next pole at the end of this one
+
+        time_text.set_text(f't = {sim_result.time_ts[frame]:.2f} s')    # update time
+
+        pole_circle.center = pivot_end
+
         # Draw tip trace
         tip_trace.append(pole_circle.center)
         if trace:
@@ -129,7 +155,7 @@ def animate_simulation(fig, ax, sim_result: SimulationResult,
             progress[frame] = entry['values'][frame]
             entry['line'].set_ydata(progress)
 
-        artists = [cart_patch, pole_line, pole_circle, time_text, tip_trace_line]
+        artists = [cart_patch, *pole_lines, pole_circle, time_text, tip_trace_line]
         artists.extend(overlay_lines)
         return artists
 
@@ -143,13 +169,13 @@ def animate_simulation(fig, ax, sim_result: SimulationResult,
     return anim, {'fps': fps, 'n_frames': n_frames}
 
 
-def add_series(ax, time: ndarray, values: ndarray, color: str='', label: str=''):
+def add_series(ax, time: ndarray, values: ndarray, label: str=''):
     '''Plot the values in a somewhat transparent line, and return
     a array of nans and a plt line that can be used to animate
     the progression of the data'''
-    color = color if color else 'blue'
     # plot all of the data in a somewhat transparent line
-    ax.plot(time, values, color=color, alpha=0.25, zorder=-1)
+    line, = ax.plot(time, values, alpha=0.25, zorder=-1)
+    color = line.get_color()
     # create a line that starts with all nans (no plot), and progressivley
     # equals the full data
     progress = np.full(len(values), np.nan)
@@ -157,7 +183,7 @@ def add_series(ax, time: ndarray, values: ndarray, color: str='', label: str='')
     return {'line': overlay_line, 'values': values, 'progress': progress}
 
 
-def make_plots(axs, sim_result: SimulationResult, plots_type: str):
+def make_plots(axs, sim_result: SimulationResult, params: PhysicalParamters, plots_type: str):
     '''Add relevant plots to the figure and prepare animated overlays'''
     overlays = []
     time = sim_result.time_ts
@@ -178,36 +204,45 @@ def make_plots(axs, sim_result: SimulationResult, plots_type: str):
         overlay = add_series(axs['xd'], time, sim_result.x_dot_ts)
         overlays.append(overlay)
 
-        axs['theta'].set_title(r'Pole angle $\theta(t)$')
-        axs['theta'].set_ylabel(r'$\theta(t)$ [rad]')
-        axs['theta'].set_xlabel('Time [s]')
-        axs['theta'].axhline(0.0, color='grey', ls='--', alpha=0.3)
-        overlay = add_series(axs['theta'], time, np.unwrap(sim_result.theta_ts))
-        overlays.append(overlay)
+        for i in range(sim_result.n_poles):
+            theta_i_ts = sim_result.thetas_ts[:, i]
+            theta_dot_i_ts = sim_result.theta_dots_ts[:, i]
 
-        axs['thetad'].set_title(r'Pole angular velocity $\dot\theta(t)$')
-        axs['thetad'].set_ylabel(r'$\dot\theta(t)$ [rad/s]')
-        axs['thetad'].set_xlabel('Time [s]')
-        axs['thetad'].axhline(0.0, color='grey', ls='--', alpha=0.3)
-        overlay = add_series(axs['thetad'], time, sim_result.theta_dot_ts)
-        overlays.append(overlay)
+            axs['theta'].set_title(rf'Pole angle $\theta_i(t)$')
+            axs['theta'].set_ylabel(rf'$\theta_i(t)$ [rad]')
+            axs['theta'].set_xlabel('Time [s]')
+            axs['theta'].axhline(0.0, color='grey', ls='--', alpha=0.3)
+            overlay = add_series(axs['theta'], time, np.unwrap(theta_i_ts), label=rf"$\theta_{i+1}$")
+            overlays.append(overlay)
+
+            axs['thetad'].set_title(rf'Pole angular velocity $\dot\theta_i(t)$')
+            axs['thetad'].set_ylabel(rf'$\dot\theta_i(t)$ [rad/s]')
+            axs['thetad'].set_xlabel('Time [s]')
+            axs['thetad'].axhline(0.0, color='grey', ls='--', alpha=0.3)
+            overlay = add_series(axs['thetad'], time, theta_dot_i_ts, label=rf"$\dot\theta_{i+1}$")
+            overlays.append(overlay)
+        axs['theta'].legend(); axs['thetad'].legend()
 
     elif plots_type == "phase":
+        for i in range(sim_result.n_poles):
+            theta_i_ts = sim_result.thetas_ts[:, i]
+            theta_dot_i_ts = sim_result.theta_dots_ts[:, i]
 
-        # change theta wrapping point to pendulum upright (the timeseries wraps at pendulum downright)
-        theta_wrapped = (np.unwrap(sim_result.theta_ts)) % (2 * np.pi)
+            # change theta wrapping point to 0, instead of pi
+            theta_i_wrapped = (np.unwrap(theta_i_ts)) % (2 * np.pi)
 
-        axs['p1'].set_title(r'$\theta(t), x(t)$ phase portrait')
-        axs['p1'].set_xlabel(r'$x(t)$ [m]')
-        axs['p1'].set_ylabel(r'$\theta(t)$ [rad]')
-        overlay = add_series(axs['p1'], sim_result.x_ts, theta_wrapped)
-        overlays.append(overlay)
+            axs['p1'].set_title(r'$\theta_i(t), x(t)$ phase portrait')
+            axs['p1'].set_xlabel(r'$x(t)$ [m]')
+            axs['p1'].set_ylabel(r'$\theta_i(t)$ [rad]')
+            overlay = add_series(axs['p1'], sim_result.x_ts, theta_i_wrapped, label=rf"$\theta_{i+1}$")
+            overlays.append(overlay)
 
-        axs['p2'].set_title(r'$\theta(t), \dot\theta(t)$ phase portrait')
-        axs['p2'].set_xlabel(r'$\dot\theta(t)$ [rad/s]')
-        axs['p2'].set_ylabel(r'$\theta(t)$ [rad]')
-        overlay = add_series(axs['p2'], sim_result.theta_dot_ts, theta_wrapped)
-        overlays.append(overlay)
+            axs['p2'].set_title(r'$\theta_i(t), \dot\theta_i(t)$ phase portrait')
+            axs['p2'].set_xlabel(r'$\dot\theta_i(t)$ [rad/s]')
+            axs['p2'].set_ylabel(r'$\theta_i(t)$ [rad]')
+            overlay = add_series(axs['p2'], theta_dot_i_ts, theta_i_wrapped, label=rf"$\dot\theta_{i+1}$")
+            overlays.append(overlay)
+        axs['p1'].legend(); axs['p2'].legend()
 
     if sim_result.controller == type(None).__name__:
         # We don't have a controller, so we plot the change in energy
@@ -228,14 +263,13 @@ def make_plots(axs, sim_result: SimulationResult, plots_type: str):
 
         # some controllers switch what they use, show this using different colors
         u_type = sim_result.cntrler_type    # np.nan will result in no line
-        colors = ["red", "blue", "green", "orange"]
         for (cntroller_name, cntroller_idx) in Controller.controllers_map.items():
             u_ts_where_controller_used = np.where(u_type == cntroller_idx, u_ts, np.nan)
             if np.isnan(u_ts_where_controller_used).all():
                 # don't show e.g. HybridController as a legend; it shows up in controllers_map, but the controllers
                 # it uses are LQR and Energy
                 continue
-            overlay = add_series(axs['u'], time, u_ts_where_controller_used, color=colors.pop(0), label=cntroller_name.partition("Controller")[0])
+            overlay = add_series(axs['u'], time, u_ts_where_controller_used, label=cntroller_name.partition("Controller")[0])
             overlays.append(overlay)
             axs['u'].legend(loc='upper right', fontsize=10)
 

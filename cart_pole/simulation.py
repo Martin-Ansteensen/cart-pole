@@ -16,6 +16,7 @@ class SimulationResult:
     controller: str
     u_ts:       ndarray
     cntrler_type:       ndarray
+    system: str
 
     @property
     def n(self) -> int:
@@ -30,12 +31,16 @@ class SimulationResult:
         return self.state_ts[:, 1]
 
     @property
-    def theta_ts(self) -> ndarray:
-        return self.state_ts[:, 2]
+    def thetas_ts(self) -> ndarray:
+        return self.state_ts[:, 2::2]
 
     @property
-    def theta_dot_ts(self) -> ndarray:
-        return self.state_ts[:, 3]
+    def theta_dots_ts(self) -> ndarray:
+        return self.state_ts[:, 3::2]
+
+    @property
+    def n_poles(self) -> int:
+        return 2 if self.system == "double" else 1
 
 
 class Simulator:
@@ -59,10 +64,12 @@ class Simulator:
 
     def run(self, initial_state: State, duration: float, dt: float) -> SimulationResult:
         '''Run the simultion fot the fill duration and return the results'''
+        assert len(initial_state) == self.dynamics.nz, "Initial state dimension does not match system"
+
         steps = int(np.ceil(duration / dt))
         time_ts = np.linspace(0.0, steps * dt, steps + 1)
 
-        state_ts = np.zeros((steps + 1, 4), dtype=float)
+        state_ts = np.zeros((steps + 1, self.dynamics.nz), dtype=float)
         state_ts[0] = initial_state
 
         energy_ts = np.zeros(steps + 1, dtype=float)
@@ -90,7 +97,7 @@ class Simulator:
             energy_ts[k + 1] = self.dynamics.calculate_energy(state_ts[k + 1])
 
         return SimulationResult(dt, time_ts, state_ts, energy_ts, type(self.controller).__name__,
-                                u_ts, cntrler_type)
+                                u_ts, cntrler_type, self.dynamics.system)
 
 
 

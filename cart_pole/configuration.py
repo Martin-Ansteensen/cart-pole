@@ -6,7 +6,7 @@ import pickle
 import numpy as np
 
 from cart_pole.control import EnergyBasedController, HybdridController, LQRController, ModelPredictiveController
-from cart_pole.dynamics import CartPoleDynamics, PhysicalParamters, SinglePhysicalParamters, DoublePhysicalParamters
+from cart_pole.dynamics import CartPoleDynamics, PhysicalParamters, SinglePhysicalParamters, DoublePhysicalParamters, PHYSICAL_CONFIGS
 import cart_pole.q_learning as ql
 import cart_pole.dqn as dqn
 
@@ -74,10 +74,7 @@ def build_physical_params(config: dict, physical_profile: str, pendulum_profile:
     the appropiate object'''
     physical_section = config[pendulum_profile]['physical']
     selection = physical_section[physical_profile]
-    if pendulum_profile == "double":
-        return DoublePhysicalParamters(**selection)
-    else:
-        return SinglePhysicalParamters(**selection)
+    return PHYSICAL_CONFIGS[pendulum_profile]['params'](**selection)
 
 def build_controller(config: dict, controller_name: str, controller_profile: str, dynamics: CartPoleDynamics, pendulum_profile: str):
     '''Create controller object based on config'''

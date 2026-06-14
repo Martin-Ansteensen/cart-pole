@@ -24,3 +24,5 @@ cart-pole-run --controller q_learning --duration 6 --initial-state 1.2 0.1 0.2 0
 
 # Deep Q-Network
 cart-pole-run --controller dqn --duration 8 --dt 0.02 --initial-state 3 0 0.8 0 --plots line --trace --save-path ./dqn_highlight.gif --no-show-animation
+
+cart-pole-run --controller none --duration 8 --initial-state 0 0 0 0 -0.5 0  --trace-tip --plots phase --system double --dt 0.005 --save-path ./double_pendulum.gif --no-show-animation
