@@ -128,9 +128,39 @@ MPC uses the dynamical model of the system to create an optimization problem, an
 
 
 ## Double pendulum (WIP)
-<div align="center">
-  <img src="media/double_pendulum_50fps.gif" width="100%"/>
-</div>
+<table width="100%">
+  <tr>
+    <th width="35%">System overview</th>
+    <th width="65%">Passive dynamics</th>
+  </tr>
+  <tr>
+    <td><img src="media/cartpole-cart-double.svg" width="100%"/></td>
+    <td><img src="media/double_pendulum_50fps.gif" width="100%"/></td>
+  </tr>
+</table>
+
+### LQR
+For a double pendulum there exists three unstable stable equilibrium and one stable. Below LQR is shown for each of these equilibriums with initial conditions close to the equilibrium.
+table width="100%">
+<table width="100%">
+  <tr>
+    <th width="50%">Both up</th>
+    <th width="50%">First down, second up</th>
+  </tr>
+  <tr>
+    <td><img src="media/double_up_up_50fps.gif" width="100%"/></td>
+    <td><img src="media/double_down_up_50fps.gif" width="100%"/></td>
+  </tr>
+  <tr>
+    <th>First up, second down</th>
+    <th>Both down (stable)</th>
+  </tr>
+  <tr>
+    <td><img src="media/double_up_down_50fps.gif" width="100%"/></td>
+    <td><img src="media/double_down_down_50fps.gif" width="100%"/></td>
+  </tr>
+</table>
+
 
 ## Installation
 - Install Python 3.8+ 

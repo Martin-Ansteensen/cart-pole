@@ -84,7 +84,7 @@ def animate_simulation(fig, ax, sim_result: SimulationResult,
 
     aspect_ratio = 9.0 / 16.0
     l = sum(params.pole_lengths)
-    y_lim = 2*array([-l * 0.4 - cart_height, l * 1.1 + cart_height])        # chosen arbitrarily
+    y_lim = 2*array([-l * 0.3 - cart_height, l * 0.6 + cart_height])        # chosen arbitrarily
     x_lim = array([-0.5, 0.5])                                              # symmetric x-axis
     x_lim *= (y_lim[1] - y_lim[0]) * 1 / aspect_ratio                       # scale to perserve aspect ratio
 
@@ -98,7 +98,7 @@ def animate_simulation(fig, ax, sim_result: SimulationResult,
     # Origin of patch is in bottom left corner, so we need to offset it
     cart_offset = np.array([-cart_width / 2.0, 0.0])
     cart_patch = FancyBboxPatch((0, 0), cart_width, cart_height,
-                                boxstyle='round, pad=0.05', fc=LIGHTBLUE, ec=DARKBLUE, lw=2)
+                                boxstyle='round, pad=0.05', fc=LIGHTBLUE, ec=DARKBLUE, lw=2, zorder=-10)
    
     pole_lines = []
     for i in range(params.n_poles):
