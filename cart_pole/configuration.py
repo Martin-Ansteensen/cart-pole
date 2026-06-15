@@ -76,16 +76,20 @@ def build_physical_params(config: dict, physical_profile: str, pendulum_profile:
     selection = physical_section[physical_profile]
     return PHYSICAL_CONFIGS[pendulum_profile]['params'](**selection)
 
-def build_controller(config: dict, controller_name: str, controller_profile: str, dynamics: CartPoleDynamics, pendulum_profile: str):
+def build_controller(config: dict, controller_name: str, controller_profile: str, dynamics: CartPoleDynamics, pendulum_profile: str, target: np.array):
     '''Create controller object based on config'''
     if controller_name == 'none':
         return None
+
+    if not target:
+        target = np.zeros(dynamics.nz)
+    assert len(target) == dynamics.nz, f'Dimension of target does not match state dimension'
 
     controllers_section = config[pendulum_profile]['controllers']
     profile_data = controllers_section[controller_name][controller_profile]
 
     if controller_name == 'lqr':
-        return LQRController(dynamics=dynamics, Q=profile_data['Q'], R=profile_data['R'])
+        return LQRController(dynamics=dynamics, Q=profile_data['Q'], R=profile_data['R'], target=target)
 
     elif controller_name == 'energy':
         return EnergyBasedController(dynamics=dynamics, **profile_data)

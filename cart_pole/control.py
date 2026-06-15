@@ -32,7 +32,7 @@ class Controller():
     @classmethod
     def wrap_theta(self, state):
         '''Wrap theta in the state so that it is in the range -pi, pi'''
-        state[2] = (state[2] + pi) % (2 * pi) - pi
+        state[2::2] = (state[2::2] + pi) % (2 * pi) - pi
         return state
 
 
@@ -40,16 +40,16 @@ class LQRController(Controller):
     '''LQR controller as described in
     https://en.wikipedia.org/wiki/Linear%E2%80%93quadratic_regulator'''
 
-    def __init__(self, dynamics: CartPoleDynamics, Q: ndarray, R: ndarray):
+    def __init__(self, dynamics: CartPoleDynamics, Q: ndarray, R: ndarray, target: ndarray=np.zeros(4)):
         '''Calculate optimal gain K based on Q, R and the dynamics of the system.'''
         super().__init__()
         self.dynamics = dynamics
         self.Q = np.diag(np.array(Q, dtype=float))
         self.R = np.diag(np.array(R, dtype=float))
 
-        # We want to regulate about the upright position with
-        # the cart in the center -> state 0 0 0 0
-        self.target = np.zeros(4)
+        print(target)
+        assert len(target) == self.dynamics.nz, f'Dimension of target does not match state dimension'
+        self.target = np.array(target)
         self.A = self.dynamics.nonlinear_state_jacobian(self.target, 0, 0)
         self.B = self.dynamics.nonlinear_control_jacobian(self.target, 0, 0)
 
@@ -62,8 +62,7 @@ class LQRController(Controller):
         '''Calculate the control action to bring the system to
         equilibrium based on the state of the system.
         Returns the control force and the controllers name index.'''
-        state = self.wrap_theta(state)
-        error = state - self.target
+        error = self.wrap_theta(state - self.target)
         force = -(self.K @ error)[0]    # is a scalar, but is returned as a ndarray
         return force, Controller.get_idx_of_controller(self.__class__.__name__)
 

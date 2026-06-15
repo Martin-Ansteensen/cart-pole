@@ -93,6 +93,13 @@ def parse_args() -> argparse.Namespace:
         choices=list(PHYSICAL_CONFIGS.keys()),
         help='Choose number of links in the pendulum',
     )
+    parser.add_argument(
+        '--target',
+        nargs='+',
+        type=float,
+        help='Target state for controller. If not provided, 0 0 ... 0 will be chosen',
+    )
+
     return parser.parse_args()
 
 def main():
@@ -104,7 +111,7 @@ def main():
 
     params = cnfg.build_physical_params(config, args.physical, args.system)
     dynamics = CartPoleDynamics(params, args.system)
-    controller = cnfg.build_controller(config, args.controller, args.controller_profile, dynamics, args.system)
+    controller = cnfg.build_controller(config, args.controller, args.controller_profile, dynamics, args.system, args.target)
 
     simulator = Simulator(dynamics, controller)
 
