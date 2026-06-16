@@ -47,7 +47,6 @@ class LQRController(Controller):
         self.Q = np.diag(np.array(Q, dtype=float))
         self.R = np.diag(np.array(R, dtype=float))
 
-        print(target)
         assert len(target) == self.dynamics.nz, f'Dimension of target does not match state dimension'
         self.target = np.array(target)
         self.A = self.dynamics.nonlinear_state_jacobian(self.target, 0, 0)

@@ -26,6 +26,10 @@ class PhysicalParamters(ABC):
     def n_poles(self) -> int:
         return len(self.pole_lengths)
 
+    @property
+    def nz(self) -> int:
+        pass
+
 
 @dataclass(slots=True)
 class SinglePhysicalParamters(PhysicalParamters):
@@ -45,6 +49,10 @@ class SinglePhysicalParamters(PhysicalParamters):
     @property
     def pole_lengths(self) -> int:
         return [self.l_1]
+
+    @property
+    def nz(self) -> int:
+        return 4
 
 @dataclass(slots=True)
 class DoublePhysicalParamters(PhysicalParamters):
@@ -67,6 +75,10 @@ class DoublePhysicalParamters(PhysicalParamters):
     @property
     def pole_lengths(self) -> int:
         return [self.l_1, self.l_2]
+    
+    @property
+    def nz(self) -> int:
+        return 6
 
 PHYSICAL_CONFIGS = {
     'single': {

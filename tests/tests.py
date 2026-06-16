@@ -159,23 +159,26 @@ class VerifySimulationStable:
 class TestController():
     '''Parent class for testing controllers, this is not a test to be run.
     Each controller test inherits from this one'''
+    params = SinglePhysicalParamters()
+    system = 'single'
+
     def create_controller(self) -> Controller:
         '''The child test will have to implement this'''
         raise NotImplemented
 
     def setUp(self):
-        self.params = SinglePhysicalParamters()
-        self.dynamics = CartPoleDynamics(self.params)
+        self.dynamics = CartPoleDynamics(self.params, self.system)
         self.controller = self.create_controller()
         self.simulator = Simulator(self.dynamics, self.controller)
         self.T = 5          # duration
         self.dt = 0.01      # timestep
 
     def testWrappedResponse(self):
-        '''Test that the regulator gives a the same response
+        '''Test that the regulator gives the same response
         if theta is increased by 2 pi'''
-        s1 = array([1, -1, 0.2, 1])
-        s2 = s1 + array([0, 0, 2*pi, 0])
+        s1 = array([1, -1] + self.params.n_poles * [0.2, 1])
+        s2 = s1
+        s2[2] += 2*pi
         res1 = self.simulator.run(s1, self.T, self.dt)
         res2 = self.simulator.run(s2, self.T, self.dt)
         epsilon = 1e-6
@@ -185,7 +188,7 @@ class TestController():
     def testMirroredResponse(self):
         '''Test that the regulator gives a mirrored response
         for a mirrored start state'''
-        s1 = array([1, -1, 0.2, 1])
+        s1 = array([1, -1] + self.params.n_poles * [0.4, 0.1])
         s2 = -s1
         res1 = self.simulator.run(s1, self.T, self.dt)
         res2 = self.simulator.run(s2, self.T, self.dt)
@@ -194,10 +197,13 @@ class TestController():
         np.testing.assert_allclose(res1.u_ts, -res2.u_ts, atol=epsilon, err_msg=msg)
 
 
-class TestLQRController(TestController, unittest.TestCase):
+class VerifyLQRController(TestController):
     '''Test LQR controller'''
     def create_controller(self):
-        return LQRController(self.dynamics, [1.0, 1.0, 1.0, 20.0], [0.1])
+        Q = np.array([1.0, 1.0] + self.params.n_poles*[10.0, 1.0])
+        R = [0.1]
+        target = np.zeros(self.params.nz)
+        return LQRController(self.dynamics, Q, R, target)
 
 
 class TestEnergyController(TestController, unittest.TestCase):
@@ -220,7 +226,7 @@ class TestModelPredictiveController(TestController, unittest.TestCase):
             dynamics=self.dynamics, Q=[4.0, 1.0, 10.0, 1.0], R=[0.1], dt=0.02, N=50,
             z_max=np.array([4.0, np.inf, np.inf, np.inf]), u_max=40.0, q_du=1.0,
             lqr_state_bounds=[2, 5, 0.4, 5],
-            lqr_kwargs={'Q': [1.0, 1.0, 1.0, 20.0], 'R': [0.1]})
+            lqr_kwargs={'Q': [1.0, 1.0, 10.0, 1.0], 'R': [0.1]})
 
 class VerifyNotebookArtifact:
     '''The notebook produces a .pkl file containing the dynamics of the system,
@@ -280,6 +286,7 @@ for system in PHYSICAL_CONFIGS.keys():
     globals()[f"TestVerifySymbolicDynamics_{system}"] = make_test_class(VerifySymbolicDynamics, system)
     globals()[f"TestVerifySimulationStable_{system}"] = make_test_class(VerifySimulationStable, system)
     globals()[f"TestVerifyNotebookArtifact{system}"] = make_test_class(VerifyNotebookArtifact, system)
+    globals()[f"TestVerifyLQRController{system}"] = make_test_class(VerifyLQRController, system)
 
 
 
