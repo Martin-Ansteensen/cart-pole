@@ -132,7 +132,7 @@ def build_controller(config: dict, controller_name: str, controller_profile: str
         return ModelPredictiveController(
             dynamics, profile_data["Q"], profile_data["R"], profile_data["dt"], profile_data["N"],
             np.array(profile_data["z_max"], dtype=float), profile_data["u_max"], profile_data["q_du"],
-            profile_data["lqr_state_bounds"], lqr_kwargs={'Q': lqr_presets['Q'], 'R': lqr_presets['R']})
+            profile_data["lqr_state_bounds"], lqr_kwargs={'Q': lqr_presets['Q'], 'R': lqr_presets['R'], 'target': target}, target=target)
 
     raise ConfigurationError(f'Unsupported controller {controller_name}')
 

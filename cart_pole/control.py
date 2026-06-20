@@ -124,7 +124,9 @@ class HybdridController(Controller):
 
 class ModelPredictiveController(Controller):
     '''Nonlinear MPC using CasADi'''
-    def __init__(self, dynamics: CartPoleDynamics, Q: np.array, R: float, dt: float, N: int, z_max: np.array, u_max: float, q_du: float, lqr_state_bounds: list, lqr_kwargs: dict):
+    def __init__(self, dynamics: CartPoleDynamics, Q: np.array, R: float, dt: float,
+                 N: int, z_max: np.array, u_max: float, q_du: float,
+                 lqr_state_bounds: list, lqr_kwargs: dict, target: ndarray=np.zeros(4)):
         super().__init__()
         self.lqr = LQRController(dynamics, **lqr_kwargs)
         self.lqr_state_bounds = lqr_state_bounds
@@ -132,17 +134,17 @@ class ModelPredictiveController(Controller):
         self.dynamics = dynamics
         self.dt = dt        # timestep when simulating prediction horizon
         self.N = N          # size of prediction horizon
-        self.nx = 4         # number of states
-        self.nu = 1         # number of inputs
+        self.nx = dynamics.nz         # number of states
+        self.nu = dynamics.nu         # number of inputs
         self.u_max = u_max  # bound on input
         self.z_max = z_max  # bound on states
+        self.target = target
 
         self.Q = np.diag(Q)          # state cost matrix
         self.q_du = q_du    # cost for changes in u
         self.R = np.diag(R)          # input cost matrix
         
         # Terminal cost calculations, use LQR solution about upright equilibrium
-        target = np.zeros(4, dtype=float)
         A = self.dynamics.nonlinear_state_jacobian(target, 0, 0)
         B = self.dynamics.nonlinear_control_jacobian(target, 0, 0)
         self.P_terminal = linalg.solve_continuous_are(A, B, self.Q, self.R)
@@ -180,9 +182,12 @@ class ModelPredictiveController(Controller):
         k2 = f(state + 0.5 * self.dt * k1, control)
         k3 = f(state + 0.5 * self.dt * k2, control)
         k4 = f(state + self.dt * k3, control)
-        next_state = state + (self.dt / 6.0) * (k1 + 2.0 * k2 + 2.0 * k3 + k4)
-        return self.wrap_theta(next_state)
+        return state + (self.dt / 6.0) * (k1 + 2.0 * k2 + 2.0 * k3 + k4)
 
+    def _wrap_theta_symbolic(self, state):
+        '''Wrap theta in the state so that it is in the range -pi, pi'''
+        state[2::2] = ca.atan2(ca.sin(state[2::2]), ca.cos(state[2::2]))
+        return state
 
     def _build_nlp(self):
         # benchmark jit False/True to check how it affects performance ()
@@ -203,7 +208,8 @@ class ModelPredictiveController(Controller):
         p_term = ca.DM(self.P_terminal)
 
         for k in range(self.N):
-            e_k = X[:, k]           # we have 0 as objective for all state variables
+            e_k = X[:, k] - self.target           # we have 0 as objective for all state variables
+            e_k = self._wrap_theta_symbolic(e_k)
             u_k = U[:, k]
             objective += ca.mtimes([e_k.T, q, e_k]) + self.R * ca.dot(u_k, u_k)
             
@@ -216,7 +222,8 @@ class ModelPredictiveController(Controller):
 
             constraints.append(X[:, k + 1] - self._rk4_symbolic(X[:, k], u_k))
         
-        e_terminal = X[:, self.N]
+        e_terminal = X[:, self.N] - self.target
+        e_terminal = self._wrap_theta_symbolic(e_terminal)
         objective += ca.mtimes([e_terminal.T, p_term, e_terminal])
 
         # lay out the state into one vector (instead of matrix) and add the input as well
@@ -229,7 +236,7 @@ class ModelPredictiveController(Controller):
             'expand': True,
             'ipopt': {
                 'print_level': 0,
-                'max_iter': 20,
+                'max_iter': 5,
                 'tol': 1e-5,
                 'acceptable_tol': 1e-4,
                 'warm_start_init_point': 'yes',

@@ -183,7 +183,7 @@ class CartPoleDynamics:
         z = ca.MX.sym('z', self.nz)
         u = ca.MX.sym('u')
         w = ca.MX.sym('w')
-        sympy_symbols = [self.z_symbols[i] for i in range(4)]
+        sympy_symbols = [self.z_symbols[i] for i in range(self.nz)]
         sympy_symbols += [self.u_symbol, self.w_symbol]
 
         f_casadi = self.sympy_to_casadi(self.f_sympy, sympy_symbols)
