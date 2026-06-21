@@ -161,6 +161,18 @@ table width="100%">
   </tr>
 </table>
 
+### NMPC
+<table width="100%">
+  <tr>
+    <th width="50%"></th>
+    <th width="50%"></th>
+  </tr>
+  <tr>
+    <td><img src="media/double_nmpc_up_up_50fps.gif" width="100%"/></td>
+    <td><img src="media/double_nmpc_up_down_50fps.gif" width="100%"/></td>
+  </tr>
+</table>
+
 
 ## Installation
 - Install Python 3.8+ 

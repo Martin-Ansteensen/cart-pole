@@ -191,7 +191,7 @@ class ModelPredictiveController(Controller):
 
     def _build_nlp(self):
         # benchmark jit False/True to check how it affects performance ()
-        self.casadi_dynamics = self.dynamics.casadi_dynamics(jit=False)
+        self.casadi_dynamics = self.dynamics.casadi_dynamics(jit=True)
 
         X = ca.MX.sym('X', self.nx, self.N + 1)                 # state at each sample in horizon
         U = ca.MX.sym('U', self.nu, self.N)                     # input at each sample in horizon
@@ -236,7 +236,7 @@ class ModelPredictiveController(Controller):
             'expand': True,
             'ipopt': {
                 'print_level': 0,
-                'max_iter': 5,
+                'max_iter': 20,
                 'tol': 1e-5,
                 'acceptable_tol': 1e-4,
                 'warm_start_init_point': 'yes',
@@ -274,11 +274,18 @@ class ModelPredictiveController(Controller):
         u_sequence = u_vec.reshape((self.nu, self.N), order='F')
         return x_sequence, u_sequence
 
+    def _shift_input_guess(self):
+        if not self.has_solution:
+            return
+
+        self.u_guess = np.roll(self.u_guess, shift=-1, axis=1)
+        self.u_guess[:, -1] = self.u_guess[:, -2]
 
     def _solve_ocp(self, state: State) -> float:
 
         self.x_guess[0] = state
 
+        self._shift_input_guess()
         self.x_guess = self._rollout(state, self.u_guess[0])
 
         x_vec = self.x_guess.T.reshape(-1, order='F')
