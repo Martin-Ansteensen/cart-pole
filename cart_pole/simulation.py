@@ -89,7 +89,7 @@ class Simulator:
 
             else:
                 u = 0
-            w = 0
+            w = 0# np.random.uniform(-5, 5, 1)[0]
             u_ts[k] = u
 
             w_ts[k] = w

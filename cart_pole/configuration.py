@@ -5,7 +5,7 @@ import pickle
 
 import numpy as np
 
-from cart_pole.control import EnergyBasedController, HybdridController, LQRController, ModelPredictiveController
+from cart_pole.control import EnergyBasedController, HybdridController, LQRController, ModelPredictiveController, AcadosModelPredictiveController
 from cart_pole.dynamics import CartPoleDynamics, PhysicalParamters, SinglePhysicalParamters, DoublePhysicalParamters, PHYSICAL_CONFIGS
 import cart_pole.q_learning as ql
 import cart_pole.dqn as dqn
@@ -83,6 +83,7 @@ def build_controller(config: dict, controller_name: str, controller_profile: str
 
     if not target:
         target = np.zeros(dynamics.nz)
+    target = np.array(target, dtype=float)
     assert len(target) == dynamics.nz, f'Dimension of target does not match state dimension'
 
     controllers_section = config[pendulum_profile]['controllers']
@@ -133,6 +134,16 @@ def build_controller(config: dict, controller_name: str, controller_profile: str
             dynamics, profile_data["Q"], profile_data["R"], profile_data["dt"], profile_data["N"],
             np.array(profile_data["z_max"], dtype=float), profile_data["u_max"], profile_data["q_du"],
             profile_data["lqr_state_bounds"], lqr_kwargs={'Q': lqr_presets['Q'], 'R': lqr_presets['R'], 'target': target}, target=target)
+
+    elif controller_name == 'acados_nmpc':
+        lqr_profile = profile_data['lqr_profile']
+        lqr_presets = controllers_section['lqr'][lqr_profile]
+
+        return AcadosModelPredictiveController(
+            dynamics, profile_data["Q"], profile_data["R"], profile_data["dt"], profile_data["N"],
+            np.array(profile_data["z_max"], dtype=float), profile_data["u_max"], profile_data["q_du"],
+            profile_data["lqr_state_bounds"], lqr_kwargs={'Q': lqr_presets['Q'], 'R': lqr_presets['R'], 'target': target},
+            target=target, solver_options=profile_data.get('solver_options'))
 
     raise ConfigurationError(f'Unsupported controller {controller_name}')
 
