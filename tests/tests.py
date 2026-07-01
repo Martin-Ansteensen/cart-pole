@@ -228,7 +228,7 @@ class TestModelPredictiveController(TestController, unittest.TestCase):
             lqr_state_bounds=[2, 5, 0.4, 5],
             lqr_kwargs={'Q': [1.0, 1.0, 10.0, 1.0], 'R': [0.1]})
 
-class VerifyNotebookArtifact:
+class VerifyNotebookSymbolicModel:
     '''The notebook produces a .pkl file containing the dynamics of the system,
     which are used for simulation. It is very convenient for debugging purposes
     that the pickle file contains the same as what would have been the result
@@ -250,20 +250,20 @@ class VerifyNotebookArtifact:
         # and not in the Github server)
         with tempfile.TemporaryDirectory() as td:
             td = pathlib.Path(td)   # path to temporary directory
-            # path to the artifact (pickle file) that will be created by the notebook
-            artifact_path = td / self.pkl_path
+            # path to the symbolic model that will be created by the notebook
+            model_path = td / self.pkl_path
             # since we are working a temporary dir, we need to make the folder
             # cartpole as it does not exist
-            artifact_path.parent.mkdir(parents=True, exist_ok=True)
+            model_path.parent.mkdir(parents=True, exist_ok=True)
             # open the notebook and run it
             with open(self.nb_path, 'r', encoding='utf-8') as f:
                 nb = read(f, as_version=NO_CONVERT)
             client = NotebookClient(nb, timeout=600, kernel_name="python3", allow_errors=False)
             client.execute(cwd=td)
 
-            self.assertTrue(artifact_path.exists(), f"Notebook did not produce {artifact_path}")
+            self.assertTrue(model_path.exists(), f"Notebook did not produce {model_path}")
 
-            self.assertEqual(load_pickle(artifact_path), load_pickle(self.pkl_path),
+            self.assertEqual(load_pickle(model_path), load_pickle(self.pkl_path),
                              "Generated .pkl differs from the one in the repo")
 
 
@@ -274,8 +274,8 @@ def make_test_class(base_class, system):
         class_name,
         (base_class, unittest.TestCase),
         {
-            "pkl_path": f'cart_pole/{PHYSICAL_CONFIGS[system]["pkl_name"]}',
-            "nb_path": f'{PHYSICAL_CONFIGS[system]["nb_name"]}',
+            "pkl_path": Path('cart_pole') / PHYSICAL_CONFIGS[system]["symbolic_model"]["path"],
+            "nb_path": PHYSICAL_CONFIGS[system]["notebook"]["path"],
             "params": PHYSICAL_CONFIGS[system]["params"](),
             "system": system,
             "__module__": __name__,
@@ -285,7 +285,7 @@ def make_test_class(base_class, system):
 for system in PHYSICAL_CONFIGS.keys():
     globals()[f"TestVerifySymbolicDynamics_{system}"] = make_test_class(VerifySymbolicDynamics, system)
     globals()[f"TestVerifySimulationStable_{system}"] = make_test_class(VerifySimulationStable, system)
-    globals()[f"TestVerifyNotebookArtifact{system}"] = make_test_class(VerifyNotebookArtifact, system)
+    globals()[f"TestVerifyNotebookSymbolicModel{system}"] = make_test_class(VerifyNotebookSymbolicModel, system)
     globals()[f"TestVerifyLQRController{system}"] = make_test_class(VerifyLQRController, system)
 
 

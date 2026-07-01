@@ -6,9 +6,9 @@ import pickle
 import numpy as np
 
 from cart_pole.control import EnergyBasedController, HybdridController, LQRController, ModelPredictiveController, AcadosModelPredictiveController
-from cart_pole.dynamics import CartPoleDynamics, PhysicalParamters, SinglePhysicalParamters, DoublePhysicalParamters, PHYSICAL_CONFIGS
-import cart_pole.q_learning as ql
-import cart_pole.dqn as dqn
+from cart_pole.dynamics import CartPoleDynamics, PhysicalParamters, PHYSICAL_CONFIGS
+import cart_pole.rl.q_learning as ql
+import cart_pole.rl.dqn as dqn
 
 
 CONFIG_FILENAME = 'configs.json'

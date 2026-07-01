@@ -83,13 +83,17 @@ class DoublePhysicalParamters(PhysicalParamters):
 PHYSICAL_CONFIGS = {
     'single': {
         "params": SinglePhysicalParamters,
-        "pkl_name": 'dynamics_single.pkl',
-        "nb_name": "dynamics_single.ipynb"
+        # Path relative to this package directory.
+        "symbolic_model": {"path": Path('symbolic_dynamics_models') / 'dynamics_single.pkl'},
+        # Path relative to the repository root.
+        "notebook": {"path": Path('derivations') / "dynamics_single.ipynb"}
     },
     'double': {
         'params': DoublePhysicalParamters,
-        'pkl_name': 'dynamics_double.pkl',
-        "nb_name": "dynamics_double.ipynb"
+        # Path relative to this package directory.
+        'symbolic_model': {'path': Path('symbolic_dynamics_models') / 'dynamics_double.pkl'},
+        # Path relative to the repository root.
+        "notebook": {"path": Path('derivations') / "dynamics_double.ipynb"}
     }
 }
 
@@ -107,7 +111,7 @@ class CartPoleDynamics:
         '''Load the dynamics in symbolic form. Replace the physical
         constants with their numerical value, and create functions
         to let us set the rest of symbols'''
-        file_path = Path(__file__).parent / PHYSICAL_CONFIGS[self.system]['pkl_name']
+        file_path = Path(__file__).parent / PHYSICAL_CONFIGS[self.system]['symbolic_model']['path']
         with open(file_path, 'rb') as f:
             data = pickle.load(f)
 
