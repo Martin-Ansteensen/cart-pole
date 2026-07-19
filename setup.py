@@ -12,7 +12,8 @@ requirements = [
     'nbclient',
     'ipykernel',
     'casadi',
-    'scikit-learn'
+    'scikit-learn',
+    'torch'
 ]
 
 setup(

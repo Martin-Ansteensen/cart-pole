@@ -1,6 +1,7 @@
 #!/usr/bin/python3
 import unittest
 import os
+import json
 import pickle
 import tempfile
 import pathlib
@@ -16,6 +17,8 @@ from nbclient import NotebookClient
 from cart_pole.dynamics import CartPoleDynamics, SinglePhysicalParamters, PhysicalParamters, State, PHYSICAL_CONFIGS
 from cart_pole.simulation import Simulator, SimulationResult
 from cart_pole.control import *
+from cart_pole.environment import Environment, EnvironmetParameters
+from cart_pole.rl import dqn, q_learning
 
 class VerifySymbolicDynamics:
     '''Test that imports of the dynamics from pickle file works, and that they
@@ -227,6 +230,105 @@ class TestModelPredictiveController(TestController, unittest.TestCase):
             z_max=np.array([4.0, np.inf, np.inf, np.inf]), u_max=40.0, q_du=1.0,
             lqr_state_bounds=[2, 5, 0.4, 5],
             lqr_kwargs={'Q': [1.0, 1.0, 10.0, 1.0], 'R': [0.1]})
+
+
+class TestRLPolicyIO(unittest.TestCase):
+
+    def test_q_learning_policy_roundtrip_uses_payload(self):
+        discretizer = q_learning.StateDiscretizer(
+            np.linspace(-1, 1, 3),
+            np.linspace(-1, 1, 3),
+            np.linspace(-1, 1, 3),
+            np.linspace(-1, 1, 3),
+        )
+        policy = q_learning.QLearningPolicy(discretizer, [-1, 1], seed=7)
+        policy.q_table[0, 0, 0, 0, 1] = 3.5
+
+        with tempfile.TemporaryDirectory() as td:
+            path = Path(td) / 'policy.pkl'
+            q_learning.save_policy(path, 7, policy, {'source': 'test'})
+            loaded = q_learning.load_policy(path)
+
+        np.testing.assert_array_equal(loaded.actions, policy.actions)
+        np.testing.assert_array_equal(loaded.q_table, policy.q_table)
+        self.assertEqual(loaded.best_action((0, 0, 0, 0)), (1, 1))
+
+    def test_rl_registration_uses_single_controller_section(self):
+        config = {
+            'single': {'controllers': {'q_learning': {}, 'dqn': {}}},
+            'double': {'controllers': {}},
+        }
+
+        with tempfile.TemporaryDirectory() as td:
+            config_path = Path(td) / 'configs.json'
+            with config_path.open('w') as f:
+                json.dump(config, f)
+
+            q_learning.register_policy('q_test', config_path)
+            dqn.register_policy('dqn_test', config_path)
+
+            registered = json.loads(config_path.read_text())
+
+        self.assertIn('q_test', registered['single']['controllers']['q_learning'])
+        self.assertIn('dqn_test', registered['single']['controllers']['dqn'])
+        self.assertEqual(registered['double']['controllers'], {})
+
+    def test_q_learning_checkpoint_saves_latest_and_best(self):
+        dynamics = CartPoleDynamics(SinglePhysicalParamters(), 'single')
+        params = EnvironmetParameters(seed=1)
+        training_params = q_learning.TrainingParameters(episodes=1, max_steps=1)
+        discretizer = q_learning.StateDiscretizer(
+            np.linspace(-1, 1, 3),
+            np.linspace(-1, 1, 3),
+            np.linspace(-1, 1, 3),
+            np.linspace(-1, 1, 3),
+        )
+        policy = q_learning.QLearningPolicy(discretizer, [-1, 1], seed=1)
+
+        with tempfile.TemporaryDirectory() as td:
+            callback = q_learning.make_checkpoint_callback(
+                'q_test', 1, dynamics, params, training_params,
+                checkpoint_every=1, eval_episodes=1, policies_dir=Path(td),
+                run_metadata={
+                    'physical_profile': 'default',
+                    'system': 'single',
+                    'initialization': {'type': 'discretized_lqr', 'profile': 'aggressive'},
+                }
+            )
+            callback(1, policy, 0.5, np.array([1]), np.array([1.0]))
+            result = callback.result()
+            saved = q_learning.load_policy_data(result.best_path)
+
+            self.assertTrue(result.latest_path.exists())
+            self.assertTrue(result.best_path.exists())
+            self.assertTrue(np.isfinite(result.best_reward))
+            self.assertEqual(saved['metadata']['run']['physical_profile'], 'default')
+            self.assertEqual(saved['metadata']['q_initialization']['type'], 'discretized_lqr')
+            self.assertEqual(saved['metadata']['training_params']['episodes'], 1)
+            self.assertEqual(saved['metadata']['env_params']['seed'], 1)
+
+    def test_dqn_checkpoint_saves_latest_and_best(self):
+        dynamics = CartPoleDynamics(SinglePhysicalParamters(), 'single')
+        params = EnvironmetParameters(seed=1)
+        training_params = dqn.TrainingParameters(num_episodes=1, max_steps=1, batch_size=1)
+        trainer = dqn.DQNTrainer(observation_dim=4, actions=[-1, 1], training_params=training_params)
+
+        with tempfile.TemporaryDirectory() as td:
+            callback = dqn.make_checkpoint_callback(
+                'dqn_test', dynamics, params, training_params,
+                checkpoint_every=1, eval_episodes=1, policies_dir=Path(td),
+                run_metadata={'physical_profile': 'default', 'system': 'single'}
+            )
+            callback(1, trainer, [1], [1.0], [0.0])
+            result = callback.result()
+            saved = dqn.load_policy_data(result.best_path)
+
+            self.assertTrue(result.latest_path.exists())
+            self.assertTrue(result.best_path.exists())
+            self.assertTrue(np.isfinite(result.best_reward))
+            self.assertEqual(saved['metadata']['run']['physical_profile'], 'default')
+            self.assertEqual(saved['metadata']['training_params']['num_episodes'], 1)
+            self.assertEqual(saved['metadata']['env_params']['seed'], 1)
 
 class VerifyNotebookSymbolicModel:
     '''The notebook produces a .pkl file containing the dynamics of the system,
