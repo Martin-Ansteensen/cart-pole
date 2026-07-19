@@ -1,7 +1,6 @@
 #!/usr/bin/python3
 import json
 from pathlib import Path
-import pickle
 
 import numpy as np
 
@@ -112,12 +111,7 @@ def build_controller(config: dict, controller_name: str, controller_profile: str
 
     elif controller_name == 'q_learning':
         policy_path = DEFAULT_CONFIG_PATH.parent / 'policies' / f'{controller_profile}.pkl'
-
-        with open(policy_path, 'rb') as f:
-            unpickler = QLearningUnpickler(f)
-            data = unpickler.load()
-
-        policy = data['policy']
+        policy = ql.load_policy(policy_path)
         return ql.QLearningController(policy)
 
     elif controller_name == 'dqn':
@@ -146,15 +140,3 @@ def build_controller(config: dict, controller_name: str, controller_profile: str
             target=target, solver_options=profile_data.get('solver_options'))
 
     raise ConfigurationError(f'Unsupported controller {controller_name}')
-
-# magic code
-# https://stackoverflow.com/questions/50465106/attributeerror-when-reading-a-pickle-file
-# error occurs because I run q_learning.py directly, and pickle classes defined in that file
-# would have been solved if I ran main.py
-# propsers other solution using copyreg
-class QLearningUnpickler(pickle.Unpickler):
-    def find_class(self, module, name):
-        if module in {'__main__', 'q_learning', 'cart_pole.q_learning'}:
-            if hasattr(ql, name):
-                return getattr(ql, name)
-        return super().find_class(module, name)

@@ -1,151 +1,148 @@
 {
   "single": {
     "physical": {
+      "default": {
+        "M": 0.5,
+        "m": 0.3,
+        "l_1": 1.0,
+        "g": 9.81,
+        "J_1": 0,
+        "m_1": 0
+      },
+      "heavy_cart": {
+        "M": 1.2,
+        "m": 0.3,
+        "l_1": 1.0,
+        "g": 9.81,
+        "J_1": 0,
+        "m_1": 0
+      },
+      "long_pole": {
+        "M": 0.5,
+        "m": 0.25,
+        "l_1": 1.5,
+        "g": 9.81,
+        "J_1": 0,
+        "m_1": 0
+      }
+    },
+    "controllers": {
+      "lqr": {
         "default": {
-          "M": 0.5,
-          "m": 0.3,
-          "l_1": 1.0,
-          "g": 9.81,
-          "J_1": 0,
-          "m_1": 0
+          "Q": [1.0, 1.0, 10.0, 1.0],
+          "R": [1.0]
         },
-        "heavy_cart": {
-          "M": 1.2,
-          "m": 0.3,
-          "l_1": 1.0,
-          "g": 9.81,
-          "J_1": 0,
-          "m_1": 0
+        "aggressive": {
+          "Q": [10.0, 10.0, 50.0, 10.0],
+          "R": [0.5]
         },
-        "long_pole": {
-          "M": 0.5,
-          "m": 0.25,
-          "l_1": 1.5,
-          "g": 9.81,
-          "J_1": 0,
-          "m_1": 0
+        "gentle": {
+          "Q": [0.2, 0.2, 2.0, 0.2],
+          "R": [2.0]
         }
       },
-      "controllers": {
-        "lqr": {
-          "default": {
-            "Q": [1.0, 1.0, 10.0, 1.0],
-            "R": [1.0]
-          },
-          "aggressive": {
-            "Q": [10.0, 10.0, 50.0, 10.0],
-            "R": [0.5]
-          },
-          "gentle": {
-            "Q": [0.2, 0.2, 2.0, 0.2],
-            "R": [2.0]
-          }
+      "energy": {
+        "default": {
+          "energy_gain": 15.0,
+          "position_gain": 2.0,
+          "velocity_gain": 2.5,
+          "umax": 100.0
         },
-        "energy": {
-          "default": {
-            "energy_gain": 15.0,
-            "position_gain": 2.0,
-            "velocity_gain": 2.5,
-            "umax": 100.0
-          },
-          "aggressive": {
-            "energy_gain": 25.0,
-            "position_gain": 1.0,
-            "velocity_gain": 1.5,
-            "umax": 150.0
-          },
-          "robust": {
-            "energy_gain": 12.5,
-            "position_gain": 4.0,
-            "velocity_gain": 4.5,
-            "umax": 80.0
-          }
+        "aggressive": {
+          "energy_gain": 25.0,
+          "position_gain": 1.0,
+          "velocity_gain": 1.5,
+          "umax": 150.0
         },
-        "hybrid": {
-          "default": {
-            "lqr_profile": "default",
-            "energy_profile": "default",
-            "switching_angle": 0.4
-          },
-          "aggressive": {
-            "lqr_profile": "aggressive",
-            "energy_profile": "aggressive",
-            "switching_angle": 0.4
-          },
-          "robust": {
-            "lqr_profile": "gentle",
-            "energy_profile": "robust",
-            "switching_angle": 0.5
-          }
+        "robust": {
+          "energy_gain": 12.5,
+          "position_gain": 4.0,
+          "velocity_gain": 4.5,
+          "umax": 80.0
+        }
+      },
+      "hybrid": {
+        "default": {
+          "lqr_profile": "default",
+          "energy_profile": "default",
+          "switching_angle": 0.4
         },
-        "q_learning": {
-          "default": {},
-          "q1": {}
+        "aggressive": {
+          "lqr_profile": "aggressive",
+          "energy_profile": "aggressive",
+          "switching_angle": 0.4
         },
-        "dqn": {
-          "default": {},
-          "100eps": {},
-          "200eps": {},
-          "300eps": {}
-        },
-        "nmpc": {
-          "default": {
-            "Q": [4.0, 1.0, 10.0, 1.0],
-            "R": [0.1],
-            "N": 50,
-            "dt": 0.02,
-            "z_max": [4.0, "inf", "inf", "inf"],
-            "u_max": 35,
-            "q_du": 1,
-            "lqr_profile": "default",
-            "lqr_state_bounds": [2, 5, 0.4, 5] 
-          },
-        "acados_nmpc": {
-          "default": {
-            "Q": [4.0, 1.0, 10.0, 1.0],
-            "R": [0.1],
-            "N": 50,
-            "dt": 0.02,
-            "z_max": [4.0, "inf", "inf", "inf"],
-            "u_max": 35,
-            "q_du": 1,
-            "lqr_profile": "default",
-            "lqr_state_bounds": [2, 5, 0.4, 5],
-            "solver_options": {
-              "verbose": false,
-              "nlp_solver_type": "SQP_RTI",
-              "qp_solver": "PARTIAL_CONDENSING_HPIPM",
-              "hessian_approx": "GAUSS_NEWTON",
-              "qp_solver_cond_N": 20
-            }
+        "robust": {
+          "lqr_profile": "gentle",
+          "energy_profile": "robust",
+          "switching_angle": 0.5
+        }
+      },
+      "q_learning": {
+        "default": {}
+      },
+      "dqn": {
+        "default": {}
+      },
+      "nmpc": {
+        "default": {
+          "Q": [4.0, 1.0, 10.0, 1.0],
+          "R": [0.1],
+          "N": 50,
+          "dt": 0.02,
+          "z_max": [4.0, "inf", "inf", "inf"],
+          "u_max": 35,
+          "q_du": 1,
+          "lqr_profile": "default",
+          "lqr_state_bounds": [2, 5, 0.4, 5]
+        }
+      },
+      "acados_nmpc": {
+        "default": {
+          "Q": [4.0, 1.0, 10.0, 1.0],
+          "R": [0.1],
+          "N": 50,
+          "dt": 0.02,
+          "z_max": [4.0, "inf", "inf", "inf"],
+          "u_max": 35,
+          "q_du": 1,
+          "lqr_profile": "default",
+          "lqr_state_bounds": [2, 5, 0.4, 5],
+          "solver_options": {
+            "verbose": false,
+            "nlp_solver_type": "SQP_RTI",
+            "qp_solver": "PARTIAL_CONDENSING_HPIPM",
+            "hessian_approx": "GAUSS_NEWTON",
+            "qp_solver_cond_N": 20
           }
         }
       }
+    }
   },
   "double": {
     "physical": {
-        "default": {
-          "M": 0.5,
-          "m": 0.3,
-          "g": 9.81,
-          "l_1": 1.0,
-          "J_1": 0.08,
-          "m_1": 0.1,
-          "l_2": 1.0,
-          "J_2": 0.08,
-          "m_2": 0.1
-        },
-        "heavy_cart": {
-          "M": 2,
-          "m": 0.3,
-          "g": 9.81,
-          "l_1": 1.0,
-          "J_1": 0.08,
-          "m_1": 0.1,
-          "l_2": 1.0,
-          "J_2": 0.08,
-          "m_2": 0.1
-        }
+      "default": {
+        "M": 0.5,
+        "m": 0.3,
+        "g": 9.81,
+        "l_1": 1.0,
+        "J_1": 0.08,
+        "m_1": 0.1,
+        "l_2": 1.0,
+        "J_2": 0.08,
+        "m_2": 0.1
+      },
+      "heavy_cart": {
+        "M": 2,
+        "m": 0.3,
+        "g": 9.81,
+        "l_1": 1.0,
+        "J_1": 0.08,
+        "m_1": 0.1,
+        "l_2": 1.0,
+        "J_2": 0.08,
+        "m_2": 0.1
+      }
     },
     "controllers": {
       "lqr": {
@@ -163,40 +160,39 @@
         }
       },
       "nmpc": {
-          "default": {
-            "Q": [1.0, 0.2, 20.0, 1.0, 30.0, 1.0],
-            "R": [0.04],
-            "N": 50,
-            "dt": 0.02,
-            "z_max": [4.0, "inf", "inf", "inf", "inf", "inf"],
-            "u_max": 50,
-            "q_du": 0.05,
-            "lqr_profile": "default",
-            "lqr_state_bounds": [0.75, 2.0, 0.2, 2.5, 0.2, 2.5] 
-          }
+        "default": {
+          "Q": [1.0, 0.2, 20.0, 1.0, 30.0, 1.0],
+          "R": [0.04],
+          "N": 50,
+          "dt": 0.02,
+          "z_max": [4.0, "inf", "inf", "inf", "inf", "inf"],
+          "u_max": 50,
+          "q_du": 0.05,
+          "lqr_profile": "default",
+          "lqr_state_bounds": [0.75, 2.0, 0.2, 2.5, 0.2, 2.5]
+        }
       },
       "acados_nmpc": {
-          "default": {
-            "Q": [1.0, 0.2, 20.0, 1.0, 30.0, 1.0],
-            "R": [0.04],
-            "N": 50,
-            "dt": 0.02,
-            "z_max": [4.0, "inf", "inf", "inf", "inf", "inf"],
-            "u_max": 50,
-            "q_du": 0.05,
-            "lqr_profile": "default",
-            "lqr_state_bounds": [0.75, 2.0, 0.2, 2.5, 0.2, 2.5],
-            "solver_options": {
-              "verbose": true,
-              "nlp_solver_type": "SQP_RTI",
-              "qp_solver": "PARTIAL_CONDENSING_HPIPM",
-              "hessian_approx": "GAUSS_NEWTON",
-              "qp_solver_cond_N": 25,
-              "print_level": 0
-            }
+        "default": {
+          "Q": [1.0, 0.2, 20.0, 1.0, 30.0, 1.0],
+          "R": [0.04],
+          "N": 50,
+          "dt": 0.02,
+          "z_max": [4.0, "inf", "inf", "inf", "inf", "inf"],
+          "u_max": 50,
+          "q_du": 0.05,
+          "lqr_profile": "default",
+          "lqr_state_bounds": [0.75, 2.0, 0.2, 2.5, 0.2, 2.5],
+          "solver_options": {
+            "verbose": true,
+            "nlp_solver_type": "SQP_RTI",
+            "qp_solver": "PARTIAL_CONDENSING_HPIPM",
+            "hessian_approx": "GAUSS_NEWTON",
+            "qp_solver_cond_N": 25,
+            "print_level": 0
+          }
         }
       }
     }
   }
-}
 }
