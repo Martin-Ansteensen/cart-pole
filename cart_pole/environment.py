@@ -6,6 +6,23 @@ import numpy as np
 from cart_pole.simulation import Simulator
 from cart_pole.dynamics import State, wrap_state
 
+ALIVE_BONUS = 1.0
+TERMINAL_PENALTY = 10.0
+X_COST = 0.25
+X_DOT_COST = 0.01
+THETA_COST = 8.0
+THETA_DOT_COST = 0.05
+ACTION_COST = 0.001
+REWARD_PARAMETERS = {
+    'alive_bonus': ALIVE_BONUS,
+    'terminal_penalty': TERMINAL_PENALTY,
+    'x_cost': X_COST,
+    'x_dot_cost': X_DOT_COST,
+    'theta_cost': THETA_COST,
+    'theta_dot_cost': THETA_DOT_COST,
+    'action_cost': ACTION_COST,
+}
+
 
 @dataclass(slots=True)
 class EnvironmetParameters:
@@ -22,12 +39,6 @@ class EnvironmetParameters:
     xd0:        float = 0.05
     th0:        float = 0.10
     thd0:       float = 0.05
-
-    # penalities used in reward function
-    px:         float = 0.24    
-    pxd:        float = 0.01    
-    pth:        float = 0.5    
-    pthd:       float = 0.05
 
 
 class Environment():
@@ -57,30 +68,28 @@ class Environment():
         self.state = wrap_state(self.state)
         return self.state.copy()
 
-    def reward(self, state, done) -> int:
+    def reward(self, state: State, action: float, done: bool) -> float:
         '''Calculate reward for current state'''
-        p = self.params
         x, xd, th, thd = state
 
+        reward = ALIVE_BONUS
+        reward -= X_COST * x**2
+        reward -= X_DOT_COST * xd**2
+        reward -= THETA_COST * th**2
+        reward -= THETA_DOT_COST * thd**2
+        reward -= ACTION_COST * action**2
         if done:
-            reward = -1.0
-        else:
-            reward = 1.0
-
-        reward -= p.px   * abs(x)
-        reward -= p.pxd  * abs(xd)
-        reward -= p.pth  * abs(th)
-        reward -= p.pthd * abs(thd)
+            reward -= TERMINAL_PENALTY
         return reward
 
-    def step(self, action: float) -> tuple[State, int, bool]:
+    def step(self, action: float) -> tuple[State, float, bool]:
         '''Advance the simulation by one step.
         Return state, reward for action taken and a flag to indicate
         if the episode is done'''
         next_state = self.sim.step(self.params.dt, self.state, action, w=0)
         next_state = wrap_state(next_state)
         done = self.out_of_bounds(next_state)
-        reward = self.reward(self.state, done)
+        reward = self.reward(next_state, action, done)
         self.state = next_state
         return next_state.copy(), reward, done
 
