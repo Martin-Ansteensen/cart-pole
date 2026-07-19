@@ -207,6 +207,8 @@ table width="100%">
   ```bash
   cart-pole-train-dqn train --help
   ```
+  Training saves `latest` and `best` checkpoints under `cart_pole/policies/checkpoints/<policy-name>/`.
+  The final registered policy is copied from the best checkpoint to `cart_pole/policies/<policy-name>`.
   All of the training parameters are not exposed through the CLI, so if you want to tune those you need to change the code.
 
 

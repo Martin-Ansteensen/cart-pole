@@ -4,7 +4,7 @@ import json
 import math
 import random
 from collections import deque, namedtuple
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Optional, Sequence
 
@@ -19,11 +19,13 @@ from cart_pole.control import Controller
 from cart_pole.dynamics import CartPoleDynamics
 from cart_pole.plotting import visualize_simulation
 from cart_pole.simulation import Simulator
-from cart_pole.environment import Environment, EnvironmetParameters
+from cart_pole.environment import Environment, EnvironmetParameters, REWARD_PARAMETERS
 
 # adapted from https://docs.pytorch.org/tutorials/intermediate/reinforcement_q_learning.html
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+SYSTEM = 'single'
+POLICIES_DIR = Path(__file__).resolve().parents[1] / 'policies'
 
 Transition = namedtuple('Transition', ('state', 'action', 'reward', 'next_state', 'done'))
 
@@ -99,6 +101,13 @@ class TrainingParameters:
     num_episodes:           int   = 300
     max_steps:              int   = 300
     memory_capacity:        int   = max_steps*10    # have space for 10 epsiodes
+
+
+@dataclass(slots=True)
+class CheckpointResult:
+    best_path:      Path
+    latest_path:    Path
+    best_reward:    float
 
 
 class DQNTrainer:
@@ -182,18 +191,21 @@ class DQNTrainer:
         self.target_net.load_state_dict(target_params)
 
 
-    def save_policy(self, path: Path):
+    def save_policy(self, path: Path, metadata=None):
         '''Save the DQN network'''
+        path.parent.mkdir(parents=True, exist_ok=True)
         state_dict = {k: v.detach().cpu() for k, v in self.policy_net.state_dict().items()}
         bundle = {
             'state_dict': state_dict,
             'observation_dim': int(self.observation_dim),
-            'actions': [float(a) for a in self.actions]
+            'actions': [float(a) for a in self.actions],
+            'metadata': metadata or {},
         }
         torch.save(bundle, path)
 
 
-def train_dqn(trainer: DQNTrainer, env: Environment, training_params: TrainingParameters):
+def train_dqn(trainer: DQNTrainer, env: Environment, training_params: TrainingParameters,
+              checkpoint_callback=None):
 
     episode_rewards = []
     episode_lengths = []
@@ -238,6 +250,9 @@ def train_dqn(trainer: DQNTrainer, env: Environment, training_params: TrainingPa
             mean_reward = np.mean(recent)
             print(f'Episode {episode + 1}: mean reward (10) = {mean_reward:.2f}, epsilon ~ {trainer.epsilon:.3f}')
 
+        if checkpoint_callback is not None:
+            checkpoint_callback(episode + 1, trainer, episode_lengths, episode_rewards, episode_losses)
+
     return episode_rewards, episode_lengths, episode_losses, epsilon_history
 
 
@@ -269,17 +284,17 @@ def plot_training_stats(rewards, lengths, losses, epsilons):
 
     fig.tight_layout()
 
-def register_policy(name: str) -> None:
-    config_path = Path(cnfg.DEFAULT_CONFIG_PATH)
+def register_policy(name: str, config_path: Path = None) -> None:
+    config_path = Path(config_path) if config_path is not None else cnfg.DEFAULT_CONFIG_PATH
     config_data = cnfg.load_config(config_path)
-    controllers = config_data['controllers']
+    controllers = config_data[SYSTEM]['controllers']
     controllers.setdefault('dqn', {})[name] = {}
     with config_path.open('w') as f:
         json.dump(config_data, f, indent=2)
 
 
 def load_policy(path: Path, device_override=None) -> DQNPolicy:
-    data = torch.load(path, map_location='cpu')
+    data = load_policy_data(path)
     observation_dim = data['observation_dim']
     actions = data['actions']
     model = DQN(observation_dim, len(actions))
@@ -288,6 +303,71 @@ def load_policy(path: Path, device_override=None) -> DQNPolicy:
     model.to(target_device)
     policy = DQNPolicy(model, actions, target_device)
     return policy
+
+
+def load_policy_data(path: Path) -> dict:
+    return torch.load(path, map_location='cpu')
+
+
+def evaluate_policy(policy: DQNPolicy, dynamics: CartPoleDynamics,
+                    env_params: EnvironmetParameters, episodes: int,
+                    max_steps: int) -> float:
+    rewards = []
+    for episode in range(episodes):
+        eval_params = EnvironmetParameters(**asdict(env_params))
+        eval_params.seed = env_params.seed + 100_000 + episode
+        eval_params.expl_init = 0.2
+        env = Environment(Simulator(dynamics), eval_params)
+        state = env.reset()
+        total_reward = 0.0
+        for _ in range(max_steps):
+            _, action = policy.select_action(state)
+            state, reward, done = env.step(action)
+            total_reward += reward
+            if done:
+                break
+        rewards.append(total_reward)
+    return float(np.mean(rewards))
+
+
+def make_checkpoint_callback(policy_name: str, dynamics: CartPoleDynamics,
+                             env_params: EnvironmetParameters,
+                             training_params: TrainingParameters,
+                             checkpoint_every: int, eval_episodes: int,
+                             policies_dir: Path = None, run_metadata=None):
+    policies_dir = Path(policies_dir) if policies_dir is not None else POLICIES_DIR
+    checkpoint_dir = policies_dir / 'checkpoints' / policy_name
+    latest_path = checkpoint_dir / 'latest.pt'
+    best_path = checkpoint_dir / 'best.pt'
+    best_reward = -np.inf
+    run_metadata = run_metadata or {}
+
+    def checkpoint(episode: int, trainer: DQNTrainer, episode_lengths,
+                   episode_rewards, episode_losses):
+        nonlocal best_reward
+        if checkpoint_every <= 0 or episode % checkpoint_every != 0:
+            return
+
+        policy = DQNPolicy(trainer.policy_net, trainer.actions, trainer.device)
+        eval_reward = evaluate_policy(policy, dynamics, env_params, eval_episodes, training_params.max_steps)
+        metadata = {
+            'episode': episode,
+            'epsilon': float(trainer.epsilon),
+            'training_params': asdict(training_params),
+            'env_params': asdict(env_params),
+            'run': run_metadata,
+            'recent_training_reward': float(episode_rewards[-1]),
+            'recent_training_loss': float(episode_losses[-1]),
+            'eval_reward': eval_reward,
+        }
+        trainer.save_policy(latest_path, metadata)
+        if eval_reward > best_reward:
+            best_reward = eval_reward
+            trainer.save_policy(best_path, metadata)
+            print(f'New best DQN checkpoint at episode {episode}: eval reward {eval_reward:.2f}')
+
+    checkpoint.result = lambda: CheckpointResult(best_path, latest_path, float(best_reward))
+    return checkpoint
 
 
 def train_cli(args) -> Path:
@@ -299,11 +379,27 @@ def train_cli(args) -> Path:
         torch.cuda.manual_seed_all(seed)
 
     actions = [-15, -5, 5, 15]
-    env_params = EnvironmetParameters(dt=args.dt, seed=seed, px=0.3)
+    env_params = EnvironmetParameters(dt=args.dt, seed=seed)
 
     config = cnfg.load_config(cnfg.DEFAULT_CONFIG_PATH)
-    physical_params = cnfg.build_physical_params(config, args.physical)
-    dynamics = CartPoleDynamics(physical_params)
+    physical_params = cnfg.build_physical_params(config, args.physical, SYSTEM)
+    run_metadata = {
+        'policy_name': args.policy_name,
+        'system': SYSTEM,
+        'physical_profile': args.physical,
+        'physical_params': asdict(physical_params),
+        'reward': REWARD_PARAMETERS,
+        'checkpoint_every': args.checkpoint_every,
+        'eval_episodes': args.eval_episodes,
+        'actions': actions,
+        'model': {
+            'type': 'DQN',
+            'hidden': 128,
+            'optimizer': 'AdamW',
+            'loss': 'SmoothL1Loss',
+        },
+    }
+    dynamics = CartPoleDynamics(physical_params, SYSTEM)
     sim = Simulator(dynamics)
     env = Environment(sim, env_params)
 
@@ -316,25 +412,56 @@ def train_cli(args) -> Path:
 
     trainer = DQNTrainer(observation_dim, actions, training_params)
 
-    trainign_stats = train_dqn(trainer, env, training_params)
+    checkpoint = make_checkpoint_callback(
+        args.policy_name, dynamics, env_params, training_params,
+        args.checkpoint_every, args.eval_episodes, run_metadata=run_metadata
+    )
+    trainign_stats = train_dqn(trainer, env, training_params, checkpoint)
     print('Training complete')
 
-    policies_dir = Path(__file__).with_name('policies')
-    save_path = policies_dir / f'{args.policy_name}.pt'
-    trainer.save_policy(save_path)
+    checkpoint_result = checkpoint.result()
+    final_policy = DQNPolicy(trainer.policy_net, trainer.actions, trainer.device)
+    final_metadata = {
+        'episode': int(training_params.num_episodes),
+        'training_params': asdict(training_params),
+        'env_params': asdict(env_params),
+        'run': run_metadata,
+        'eval_reward': evaluate_policy(final_policy, dynamics, env_params, args.eval_episodes, training_params.max_steps),
+    }
+    trainer.save_policy(checkpoint_result.latest_path, final_metadata)
+    if final_metadata['eval_reward'] > checkpoint_result.best_reward:
+        trainer.save_policy(checkpoint_result.best_path, final_metadata)
+    save_path = POLICIES_DIR / f'{args.policy_name}.pt'
+    source_path = checkpoint_result.best_path if checkpoint_result.best_path.exists() else checkpoint_result.latest_path
+    save_path.parent.mkdir(parents=True, exist_ok=True)
+    save_path.write_bytes(source_path.read_bytes())
 
     register_policy(args.policy_name)
-    print(f'Saved policy to {save_path}')
+    print(f'Saved best policy to {save_path}')
 
-    plot_training_stats(*trainign_stats)
+    if not args.no_show_animation:
+        plot_training_stats(*trainign_stats)
 
     trained_policy = load_policy(save_path)
     controller = DQNController(trained_policy)
     simulator = Simulator(dynamics, controller)
     result = simulator.run([0.5, 0, 0.2, 0], 8, args.dt,)
-    visualize_simulation(result, physical_params, plots=True, trace=True, save_path=None)
+    visualize_simulation(result, physical_params, plots_type='line', trace=True,
+                         save_path=None, show=(not args.no_show_animation))
 
     return save_path
+
+
+def examine_policy(args):
+    data = load_policy_data(args.path)
+    summary = {
+        'path': str(args.path),
+        'observation_dim': data['observation_dim'],
+        'actions': data['actions'],
+        'state_dict_keys': list(data['state_dict'].keys()),
+        'metadata': data.get('metadata', {}),
+    }
+    print(json.dumps(summary, indent=2))
 
 
 def parse_args() -> argparse.ArgumentParser:
@@ -344,7 +471,11 @@ def parse_args() -> argparse.ArgumentParser:
     )
     sub_parsers = parser.add_subparsers(dest='command')
 
-    train = sub_parsers.add_parser('train', help='Train a DQN agent')
+    train = sub_parsers.add_parser(
+        'train',
+        help='Train a DQN agent',
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+    )
     train.set_defaults(func=train_cli)
     train.add_argument('--physical', default='default', help='Physical profile name')
     train.add_argument('--dt', type=float, default=0.02, help='Integration time step')
@@ -352,7 +483,17 @@ def parse_args() -> argparse.ArgumentParser:
     train.add_argument('--max-steps', type=int, default=500, help='Maximum steps per episode')
     train.add_argument('--policy-name', type=str, required=True, help='Name of policy')
     train.add_argument('--seed', type=int, default=42, help='Seed for random generator in policy')
+    train.add_argument('--checkpoint-every', type=int, default=10, help='Episodes between checkpoints')
+    train.add_argument('--eval-episodes', type=int, default=5, help='Evaluation episodes per checkpoint')
+    train.add_argument('--no-show-animation', action='store_true', help='Do not show final training plots or animation')
 
+    examine = sub_parsers.add_parser(
+        'examine',
+        help='Inspect a saved DQN policy',
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+    )
+    examine.set_defaults(func=examine_policy)
+    examine.add_argument('--path', type=Path, required=True, help='Path to .pt')
 
     args = parser.parse_args()
     return args.func(args)
